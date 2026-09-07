@@ -1,0 +1,12 @@
+# Rust
+/target/
+Cargo.lock
+
+# Windows / macOS / Linux
+.DS_Store
+Thumbs.db
+
+# Editoriales
+.vscode/
+.idea/
+*.swp
