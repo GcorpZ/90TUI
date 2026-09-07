@@ -1,19 +1,19 @@
 # 90TUI — FASE 1: Plan de Diseño
 
-> Rama docs: `90tui-docs` | Objetivo: mejor alternativa a Ratatui para exigentes, con alma SAINT/Clipper.
+> Rama docs: `90tui-docs` | Objetivo: mejor alternativa a Ratatui para exigentes, con el alma de la gTUI de gestión de los 90.
 
 ## 1. Visión
 
 Ratatui es excelente pero "se siente TUI": box-drawing por todos lados, alto contraste, hay que hacer malabares para un menú desplegable decente.
 **90TUI = gTUI artesanal de los 90, reencarnada en Rust seguro:**
-llamas `menu_bar()`, `popup()`, `form()`, `browse()` y la pantalla queda como SAINT 7.51: pastel, sombreada, responsive, con pila de pantallas y hotkeys amarillas automáticas.
+llamas `menu_bar()`, `popup()`, `form()`, `browse()` y la pantalla queda como la gestión Clipper de principios de los 90: pastel, sombreada, responsive, con pila de pantallas y hotkeys amarillas automáticas.
 
 Lema: `Una función = un control completo en pantalla.`
 
 ## 2. Objetivos medibles
 
 * O1 Facilidad: menú con sub-opciones en <10 líneas (ejemplo §7).
-* O2 Fidelidad SAINT: `Theme::Saint751` reproduce capturas con delta visual <5% (inspección).
+* O2 Fidelidad a la técnica Clipper: `Theme::clipper()` reproduce el look de referencia con delta visual <5% (inspección contra capturas).
 * O3 Responsive: 80x25 mínimo, hasta 200x60, sin solapamientos rotos. Layout por `Rect` + anclas.
 * O4 Rendimiento: diff-render 60fps en terminal típica, sin flicker (doble buffer).
 * O5 Portabilidad: Windows (conhost/Windows Terminal), macOS (Terminal/iTerm), Linux (xterm/kitty). Solo `crossterm` como backend.
@@ -26,9 +26,9 @@ No-objetivos v1: mouse pixel-perfect DOS, sonido PC-speaker, DBF/NTX real, fuent
 ```
 ┌ App (loop eventos, foco, F-keys) ─────────┐
 │ Controles alto nivel (Menu, Form, Browse, │  <- UNA LLAMADA
-│  Dialog, Progress, StarMenu)              │
-│ Primitivas SAINT (Window, Button, Bar,    │  <- relleno+sombra
-│  Separator, HotLabel)                     │
+│  Dialog, Progress, Launcher)              │
+│ Primitivas estilo Clipper (Window,        │  <- relleno+sombra
+│  Button, Bar, Separator, HotLabel)        │
 │ Núcleo (Cell, Buffer, Rect, Theme,        │  <- VRAM virtual
 │  ScreenStack, DiffRenderer, Backend)      │
 └── crossterm (ANSI, teclado, resize) ──────┘
@@ -45,7 +45,7 @@ No-objetivos v1: mouse pixel-perfect DOS, sonido PC-speaker, DBF/NTX real, fuent
 `src/core/{cell.rs, color.rs, rect.rs, buffer.rs, theme.rs, screen.rs, backend.rs}`
 + `lib.rs` re-exports. Tests: buffer diff, rect clip, stack push/pop.
 
-**Parte 2 — Primitivas gTUI SAINT (FASE 4):**
+**Parte 2 — Primitivas gTUI estilo Clipper (FASE 4):**
 `src/prim/{window.rs, shadow.rs, button.rs, label.rs, separator.rs, title.rs}`
 Ventana plana + sombra dura, botón teal, hotlabel amarilla, separador blanco, titlebar teal/navy.
 
@@ -54,23 +54,23 @@ Ventana plana + sombra dura, botón teal, hotlabel amarilla, separador blanco, t
 API: `popup_menu(buf, items)`, `dual_progress()`, `confirm_si_no()`, `input_field()` estilo `@...GET`.
 
 **Parte 4 — App shell + eventos + responsive (FASE 6):**
-`src/app/{app.rs, events.rs, focus.rs, layout.rs, fkeys.rs}`, `examples/saint_shell.rs`, `examples/ordenar_indices.rs` (recrea captura).
+`src/app/{app.rs, events.rs, focus.rs, layout.rs, fkeys.rs}`, `examples/clipper_shell.rs`, `examples/ordenar_indices.rs` (recrea layout de captura de referencia).
 Loop: `poll → update → render_diff → present`. Resize re-layout automático.
 
 ## 5. Catálogo API v1 (firmas objetivo, pueden variar poco)
 
 ```rust
 // Shell
-90tui::app::App::new(Theme::Saint751)?.run(|scr| saint_demo(scr))?;
+90tui::app::App::new(Theme::clipper())?.run(|scr| demo(scr))?;
 
 // Una llamada = control responsive
 menu_bar(scr, &["Archivos","Transacciones","Reportes","Varios"], 3)?;
 popup_menu(scr, anchor, &["Estado del &sistema","Resumen &gerencial","Cierre &mensual"])?;
 confirm(scr, "¿ Está conforme ?", &["Si","No"])?; // botones teal + sombra
 input_form(scr, "DEPARTAMENTOS", &[Field::text("Código"), Field::text("Descripción")])?;
-browse_table(scr, headers, rows)?; // estilo CARGOS DE INVENTARIO
+browse_table(scr, headers, rows)?; // estilo tabla de inventario de la época
 dual_progress(scr, "ORDENAR INDICES", &Progress{file:"APROD.DAT", pct:12, cur:60, total:546})?;
-status_bar(scr, "SAINT Versión 7.51", "Alt-F1: Ayuda")?;
+status_bar(scr, "TUI90 Demo v0.0.1", "Alt-F1: Ayuda")?;
 fkey_bar(scr, &[("F2","Grabar"),("Esc","Salir")])?;
 ```
 
@@ -86,11 +86,11 @@ fkey_bar(scr, &[("F2","Grabar"),("Esc","Salir")])?;
 ## 7. Ejemplo canónico (la promesa)
 
 ```rust
-use _90tui as tui; // crate name `ntui90`? final: `90tui` -> ident `tui90`
+use tui90 as tui;
 fn main() -> anyhow::Result<()> {
-    let mut app = tui::App::new(tui::Theme::Saint751)?;
-    app.top_bar("FERREAGRO SION", "Jueves 26 de Diciembre de 2013")?;
-    app.status("SAINT Versión 7.51  Serial: 5465FS0565", "Alt-F1: Ayuda")?;
+    let mut app = tui::App::new(tui::Theme::clipper())?;
+    app.top_bar("EMPRESA DEMO C.A.", "Jueves 26 de Diciembre de 2013")?;
+    app.status("TUI90 Demo v0.0.1", "Alt-F1: Ayuda")?;
     let menus = vec![
         ("Archivos", vec!["Proveedores","Departamentos","Depósitos"]),
         ("Varios", vec!["Estado del sistema","Respaldo de datos","Ordenar índices","Finalizar"]),
@@ -102,7 +102,7 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-Esto recrea `SAIN_Admin2/3.png` sin malabares.
+Esto recrea el shell clásico de gestión sin malabares.
 
 ## 8. Riesgos y mitigaciones
 
@@ -116,7 +116,7 @@ Esto recrea `SAIN_Admin2/3.png` sin malabares.
 * F3: `cargo test` buffer/stack verde, example `blank` sin flicker.
 * F4: example `windows` muestra sombras idénticas a captura (foto vs screenshot).
 * F5: `popup_menu` + `confirm` + `dual_progress` recrean ORDENAR INDICES.
-* F6: `saint_shell` navegable solo con teclado, resize sin romper, F-keys operativas.
+* F6: `clipper_shell` navegable solo con teclado, resize sin romper, F-keys operativas.
 
 ---
 Siguiente: `FASE2-partes-libreria.md` (explicación pedagógica).
