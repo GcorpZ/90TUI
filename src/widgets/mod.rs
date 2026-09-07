@@ -1,0 +1,24 @@
+//! Controles de una llamada (Fase 5): menús, listas, diálogos,
+//! progresos, formularios, tablas y botonera de función.
+//!
+//! Todo dibuja sobre `Buffer`/`Screen` con la pila `savescreen` para
+//! apilar. La navegación es pura (`*_key`) para probarse sin TTY;
+//! el loop de eventos llega en Fase 6 (`app`).
+
+pub mod dialog;
+pub mod form;
+pub mod list;
+pub mod menubar;
+pub mod popup;
+pub mod progress;
+pub mod statusbar;
+pub mod table;
+
+pub use dialog::{confirm_draw, confirm_key, confirm_layout, DialogKey};
+pub use form::{form_draw, form_key, Field, FieldKind, FormKey, FormState};
+pub use list::{list_draw, list_key};
+pub use menubar::{menubar_draw, menubar_key, MenuBarKey, MenuDef, MenuItem};
+pub use popup::{popup_draw, popup_key, popup_layout, popup_size, PopupItem, PopupKey};
+pub use progress::{bar_fill_width, progress_draw, BarInfo, ProgressInfo};
+pub use statusbar::fkey_bar;
+pub use table::{table_draw, table_key, TableDef, TableState};

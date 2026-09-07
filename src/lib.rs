@@ -11,6 +11,7 @@
 
 pub mod core;
 pub mod prim;
+pub mod widgets;
 
 // Re-exports para `use tui90::Buffer;` directo.
 pub use core::{
@@ -20,6 +21,13 @@ pub use core::{
 pub use prim::{
     button, button_width, draw_hot_label, draw_text, fit_text, hot_key_of, hsep, parse_hotkey,
     shadow, shadow_offset, status_bar, top_bar, visible_len, window, WindowOpts,
+};
+pub use widgets::{
+    bar_fill_width, confirm_draw, confirm_key, confirm_layout, fkey_bar, form_draw, form_key,
+    list_draw, list_key, menubar_draw, menubar_key, popup_draw, popup_key, popup_layout,
+    popup_size, progress_draw, table_draw, table_key, BarInfo, DialogKey, Field, FieldKind,
+    FormKey, FormState, MenuBarKey, MenuDef, MenuItem, PopupItem, PopupKey, ProgressInfo, TableDef,
+    TableState,
 };
 
 /// Versión del crate.

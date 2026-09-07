@@ -120,6 +120,10 @@ impl Theme {
     pub fn popup_sel_attr(self) -> Attr {
         Attr::bold(self.select_fg, self.select_bg)
     }
+    /// Selección de lista de trabajo: barra azul + texto blanco.
+    pub fn list_sel_attr(self) -> Attr {
+        Attr::bold(self.popup_text, self.popup)
+    }
     pub fn hot_attr(self) -> Attr {
         Attr::bold(self.hot, self.popup)
     }
