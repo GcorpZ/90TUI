@@ -1,4 +1,4 @@
-//! 90TUI (`tui90`) — gTUI artesanal estilo SAINT 7.51 / CA-Clipper para Rust.
+//! 90TUI (`tui90`) — gTUI artesanal de los 90 al estilo de la técnica CA-Clipper para Rust.
 //!
 //! Licencia dual: MIT OR Apache-2.0. Ver `LICENSE-MIT` y `LICENSE-APACHE`.
 //!
