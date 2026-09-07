@@ -9,11 +9,17 @@
 //! * `widgets` _(Fase 5)_ — controles de una llamada (menús, forms, tablas).
 //! * `app` _(Fase 6)_ — loop de eventos, foco y layout responsive.
 
+pub mod app;
 pub mod core;
 pub mod prim;
 pub mod widgets;
 
 // Re-exports para `use tui90::Buffer;` directo.
+pub use app::{
+    centered as app_centered, desktop as app_desktop, draw_fkeys, map_key, match_fkey,
+    menu_title_x, poll_event, popup as app_popup, test_app, to_crossterm, App, AppEvent, AppKey,
+    DesktopLayout, FKeyDef, Focus, Layer, ShellContent,
+};
 pub use core::{
     enter_screen, leave_screen, Attr, Backend, Buffer, Cell, Color, CrosstermBackend, DrawOp, Rect,
     Screen, ScreenStack, Snapshot, TestBackend, Theme,
