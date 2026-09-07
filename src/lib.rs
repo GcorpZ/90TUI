@@ -10,11 +10,16 @@
 //! * `app` _(Fase 6)_ — loop de eventos, foco y layout responsive.
 
 pub mod core;
+pub mod prim;
 
-// Re-export del núcleo para `use tui90::Buffer;` directo.
+// Re-exports para `use tui90::Buffer;` directo.
 pub use core::{
     enter_screen, leave_screen, Attr, Backend, Buffer, Cell, Color, CrosstermBackend, DrawOp, Rect,
     Screen, ScreenStack, Snapshot, TestBackend, Theme,
+};
+pub use prim::{
+    button, button_width, draw_hot_label, draw_text, fit_text, hot_key_of, hsep, parse_hotkey,
+    shadow, shadow_offset, status_bar, top_bar, visible_len, window, WindowOpts,
 };
 
 /// Versión del crate.

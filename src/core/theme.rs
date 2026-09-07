@@ -29,6 +29,7 @@ pub struct Theme {
     pub form_bg: Color,
     pub form_text: Color,
     pub field_bg: Color,
+    pub window_bg: Color,
     pub status_bg: Color,
     pub status_fg: Color,
 }
@@ -58,6 +59,7 @@ impl Theme {
             form_bg: Color::Black,
             form_text: Color::White,
             field_bg: Color::Grey,
+            window_bg: Color::Grey,
             status_bg: Color::Navy,
             status_fg: Color::White,
         }
@@ -85,6 +87,7 @@ impl Theme {
             form_bg: Color::Blue,
             form_text: Color::White,
             field_bg: Color::Cyan,
+            window_bg: Color::Grey,
             status_bg: Color::Navy,
             status_fg: Color::White,
         }
