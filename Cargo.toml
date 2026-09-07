@@ -16,9 +16,8 @@ name = "tui90"
 path = "src/lib.rs"
 
 [dependencies]
-# Backend único de terminal (Fase 3 en adelante)
-# crossterm = "0.28"
-# unicode-width = "0.1"
+crossterm = "0.28"
+unicode-width = "0.1"
 
 [dev-dependencies]
 

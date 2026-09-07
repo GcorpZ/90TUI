@@ -2,11 +2,22 @@
 //!
 //! Licencia dual: MIT OR Apache-2.0. Ver `LICENSE-MIT` y `LICENSE-APACHE`.
 //!
-//! Estado: esqueleto de documentación (Fase 0-2). La construcción por partes
-//! vive en la rama `90tui-built` a partir de la Fase 3:
-//! Parte 1 `core`, Parte 2 `prim`, Parte 3 `widgets`, Parte 4 `app`.
+//! # Capas
+//! * [`core`] — VRAM virtual: celdas, rects, back-buffer con diff,
+//!   pila `Savescreen`/`Restscreen`, temas SAINT/Turbo y backend crossterm.
+//! * `prim` _(Fase 4)_ — ventanas planas con sombra dura, botones, hotlabels.
+//! * `widgets` _(Fase 5)_ — controles de una llamada (menús, forms, tablas).
+//! * `app` _(Fase 6)_ — loop de eventos, foco y layout responsive.
 
-/// Versión del esqueleto documental.
+pub mod core;
+
+// Re-export del núcleo para `use tui90::Buffer;` directo.
+pub use core::{
+    enter_screen, leave_screen, Attr, Backend, Buffer, Cell, Color, CrosstermBackend, DrawOp, Rect,
+    Screen, ScreenStack, Snapshot, TestBackend, Theme,
+};
+
+/// Versión del crate.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(test)]
@@ -16,5 +27,12 @@ mod tests {
     #[test]
     fn skeleton_version_is_set() {
         assert!(!VERSION.is_empty());
+    }
+
+    #[test]
+    fn core_is_reexported() {
+        let t = Theme::saint751();
+        let s = Screen::new(80, 25, t);
+        assert_eq!(s.size(), (80, 25));
     }
 }
