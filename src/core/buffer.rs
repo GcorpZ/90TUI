@@ -120,7 +120,7 @@ impl Buffer {
         }
     }
 
-    /// Texto en negrita (títulos SAINT).
+    /// Texto en negrita (títulos de la época).
     pub fn text_bold(&mut self, x: u16, y: u16, s: &str, fg: Color, bg: Color) {
         if y >= self.h {
             return;
@@ -142,7 +142,7 @@ impl Buffer {
         }
     }
 
-    /// Línea horizontal de un glifo (separadores de grupos SAINT).
+    /// Línea horizontal de un glifo (separadores de grupos de menús).
     pub fn hline(&mut self, y: u16, x0: u16, x1: u16, ch: char, fg: Color, bg: Color) {
         if y >= self.h {
             return;
@@ -279,14 +279,14 @@ mod tests {
     #[test]
     fn snapshot_restore_roundtrip() {
         let mut b = Buffer::blank(10, 5, Color::White);
-        b.text(1, 1, "SAINT", Color::Black, Color::White);
+        b.text(1, 1, "DEMO", Color::Black, Color::White);
         let snap = b.snapshot(Rect::new(0, 0, 10, 5));
         b.fill_rect(
             Rect::new(0, 0, 10, 5),
             Cell::new(' ', Color::White, Color::Blue),
         );
         b.restore(&snap);
-        assert_eq!(b.get(1, 1).unwrap().ch, 'S');
+        assert_eq!(b.get(1, 1).unwrap().ch, 'D');
         assert_eq!(b.get(1, 1).unwrap().bg, Color::White);
     }
 }

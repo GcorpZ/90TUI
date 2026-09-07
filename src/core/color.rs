@@ -6,7 +6,7 @@
 
 use crossterm::style::Color as Cc;
 
-/// Paleta base. Nombres pensados para el tema SAINT pastel;
+/// Paleta base. Nombres pensados para el tema pastel estilo Clipper;
 /// `Theme::turbo()` los reutiliza con otra asignación.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Color {
@@ -14,7 +14,7 @@ pub enum Color {
     Navy, // azul oscuro de barras (VGA DarkBlue)
     Blue, // azul medio de popups
     Teal, // teal oscuro de menús/botones (VGA DarkCyan)
-    Cyan, // cian brillante del escritorio SAINT
+    Cyan, // cian brillante del escritorio de la época
     DarkGrey,
     Grey, // gris de selección / ventanas
     White,

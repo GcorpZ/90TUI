@@ -1,10 +1,10 @@
-//! 90TUI (`tui90`) — gTUI artesanal estilo SAINT 7.51 / CA-Clipper para Rust.
+//! 90TUI (`tui90`) — gTUI artesanal de los 90 al estilo de la técnica CA-Clipper para Rust.
 //!
 //! Licencia dual: MIT OR Apache-2.0. Ver `LICENSE-MIT` y `LICENSE-APACHE`.
 //!
 //! # Capas
 //! * [`core`] — VRAM virtual: celdas, rects, back-buffer con diff,
-//!   pila `Savescreen`/`Restscreen`, temas SAINT/Turbo y backend crossterm.
+//!   pila `Savescreen`/`Restscreen`, temas Clipper/Turbo y backend crossterm.
 //! * `prim` _(Fase 4)_ — ventanas planas con sombra dura, botones, hotlabels.
 //! * `widgets` _(Fase 5)_ — controles de una llamada (menús, forms, tablas).
 //! * `app` _(Fase 6)_ — loop de eventos, foco y layout responsive.
@@ -31,7 +31,7 @@ mod tests {
 
     #[test]
     fn core_is_reexported() {
-        let t = Theme::saint751();
+        let t = Theme::clipper();
         let s = Screen::new(80, 25, t);
         assert_eq!(s.size(), (80, 25));
     }

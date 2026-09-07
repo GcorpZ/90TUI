@@ -1,4 +1,4 @@
-//! Ejemplo `blank`: shell base SAINT sin flicker (aceptación Fase 3).
+//! Ejemplo `blank`: shell base estilo Clipper sin flicker (aceptación Fase 3).
 //!
 //! Pinta escritorio cian + área blanca + barras navy, presenta por diff
 //! y sale con `Esc` o `q`. Redimensionar repinta todo (resize = full frame).
@@ -18,7 +18,7 @@ fn paint(s: &mut Screen) {
     let t = s.theme;
     let bounds = s.bounds();
     s.frame().fill_rect(bounds, Cell::blank(t.desktop));
-    // Área de trabajo blanca con inset de 2x3 (como SAIN_Admin2.png).
+    // Área de trabajo blanca con inset de 2x3 (layout clásico de gestión).
     let work = Rect::new(2, 3, bounds.w.saturating_sub(4), bounds.h.saturating_sub(6));
     let work = work.clamp_in(bounds);
     s.frame().fill_rect(work, Cell::blank(t.work));
@@ -30,11 +30,11 @@ fn paint(s: &mut Screen) {
         Cell::blank(t.navy),
     );
     s.frame()
-        .text_bold(2, 0, "FERREAGRO SION", t.status_fg, t.navy);
+        .text_bold(2, 0, "EMPRESA DEMO C.A.", t.status_fg, t.navy);
     s.frame().text(
         2,
         bounds.h.saturating_sub(1),
-        "SAINT Version 7.51",
+        "TUI90 Demo v0.0.1",
         t.status_fg,
         t.navy,
     );
@@ -59,7 +59,7 @@ fn main() -> io::Result<()> {
 
 fn run() -> io::Result<()> {
     let (w, h) = crossterm::terminal::size().unwrap_or((80, 25));
-    let mut screen = Screen::new(w, h, Theme::saint751());
+    let mut screen = Screen::new(w, h, Theme::clipper());
     let mut be = CrosstermBackend::new(stdout());
     paint(&mut screen);
     be.present(&screen.present_ops())?;

@@ -1,8 +1,8 @@
 //! Pila de pantallas (`Savescreen()`/`Restscreen()`) + doble buffer.
 //!
 //! En Clipper cada ventana guardaba lo que había debajo y lo restauraba
-//! al cerrarse, permitiendo N modales apilados (en las capturas SAINT
-//! se ven 3 niveles: base + ORDENAR INDICES + progreso). Aquí igual:
+//! al cerrarse, permitiendo N modales apilados (en las capturas de referencia
+//! se ven hasta 3 niveles: base + diálogo + progreso). Aquí igual:
 //! `savescreen(rect)` devuelve un id LIFO; `restscreen(id)` restaura.
 //! `Screen` además guarda `back` (donde dibujan los widgets) y `front`
 //! (lo último enviado a la terminal) para el `diff`.
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn save_restore_roundtrip_over_back() {
-        let mut s = Screen::new(20, 10, Theme::saint751());
+        let mut s = Screen::new(20, 10, Theme::clipper());
         s.frame().text(2, 2, "FONDO", Color::Black, Color::White);
         let id = s.savescreen(Rect::new(0, 0, 20, 10));
         assert_eq!(id, 0);
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn restore_is_strict_lifo() {
-        let mut s = Screen::new(20, 10, Theme::saint751());
+        let mut s = Screen::new(20, 10, Theme::clipper());
         let a = s.savescreen(Rect::new(0, 0, 5, 5));
         let _b = s.savescreen(Rect::new(5, 5, 5, 5));
         // Intentar restaurar `a` sin haber cerrado `b` falla.
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn present_ops_then_noop() {
-        let mut s = Screen::new(10, 5, Theme::saint751());
+        let mut s = Screen::new(10, 5, Theme::clipper());
         let ops = s.present_ops();
         assert_eq!(ops.len(), 10 * 5); // primer frame: todo es nuevo
         let ops2 = s.present_ops();
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn resize_keeps_top_left_and_clears_stack() {
-        let mut s = Screen::new(10, 5, Theme::saint751());
+        let mut s = Screen::new(10, 5, Theme::clipper());
         s.frame().text(0, 0, "AB", Color::Black, Color::White);
         s.savescreen(Rect::new(0, 0, 4, 4));
         s.resize(20, 10);

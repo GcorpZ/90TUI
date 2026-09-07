@@ -27,7 +27,7 @@ fn buffer_diff_reports_only_changed_cells() {
 
 #[test]
 fn screenstack_save_restore_is_lifo() {
-    let theme = Theme::saint751();
+    let theme = Theme::clipper();
     let mut s = Screen::new(40, 12, theme);
     s.frame().text(1, 1, "BASE", Color::Black, Color::White);
     let id_base = s.savescreen(Rect::new(0, 0, 40, 12));
@@ -67,15 +67,15 @@ fn stack_standalone_push_pop() {
 
 #[test]
 fn full_frame_flow_into_test_backend() {
-    let theme = Theme::saint751();
+    let theme = Theme::clipper();
     let mut s = Screen::new(80, 25, theme);
-    // Base estilo SAINT: escritorio + área de trabajo blanca.
+    // Base estilo Clipper: escritorio + área de trabajo blanca.
     let bounds = s.bounds();
     s.frame().fill_rect(bounds, Cell::blank(theme.desktop));
     let work = Rect::new(2, 3, 76, 18);
     s.frame().fill_rect(work, Cell::blank(theme.work));
     s.frame()
-        .text(4, 4, "FERREAGRO SION", Color::White, theme.navy);
+        .text(4, 4, "EMPRESA DEMO", Color::White, theme.navy);
 
     let mut be = TestBackend::new(80, 25);
     let ops = s.present_ops();

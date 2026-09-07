@@ -2,12 +2,12 @@
 name = "tui90"
 version = "0.0.1"
 edition = "2021"
-description = "90TUI — gTUI artesanal estilo SAINT 7.51 / CA-Clipper para Rust. Alternativa pastel, de una-llamada, a Ratatui."
+description = "90TUI — gTUI artesanal de los 90 al estilo de la técnica CA-Clipper para Rust. Alternativa pastel, de una-llamada, a Ratatui."
 homepage = "https://github.com/GcorpZ/90TUI"
 repository = "https://github.com/GcorpZ/90TUI.git"
 license = "MIT OR Apache-2.0"
 authors = ["GcorpZ (Pedro Garcia Castillo)"]
-keywords = ["tui", "terminal", "retro", "clipper", "saint"]
+keywords = ["tui", "terminal", "retro", "clipper", "pastel"]
 categories = ["command-line-interface", "gui"]
 rust-version = "1.75"
 

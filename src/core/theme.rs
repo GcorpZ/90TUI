@@ -1,8 +1,8 @@
-//! Temas de color: SAINT pastel por defecto, Turbo opt-in.
+//! Temas de color: pastel estilo Clipper por defecto, Turbo opt-in.
 //!
 //! La queja original contra Ratatui/Turbo Vision era el alto contraste
 //! que "hace doler a la vista". El tema por defecto reproduce la
-//! paleta refrescante de SAINT 7.51 (cian/teal/azul medio/gris/amarillo
+//! paleta refrescante de la escuela Clipper (cian/teal/azul medio/gris/amarillo
 //! hotkey sobre fondos claros). Nada de colores hardcodeados en los
 //! widgets: todo sale de aquí.
 
@@ -34,11 +34,11 @@ pub struct Theme {
 }
 
 impl Theme {
-    /// SAINT Administrativo 7.51 (ver FASE0): escritorio cian, trabajo
+    /// Paleta pastel de la escuela CA-Clipper (ver FASE0): escritorio cian, trabajo
     /// blanco, barras navy, menús teal, popups azul medio, hotkeys
     /// amarillas, selección gris+negro, botones teal, diálogos menta,
     /// formularios negros, sombras negras duras.
-    pub fn saint751() -> Self {
+    pub fn clipper() -> Self {
         Self {
             desktop: Color::Cyan,
             work: Color::White,
@@ -139,7 +139,7 @@ impl Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Self::saint751()
+        Self::clipper()
     }
 }
 
@@ -148,9 +148,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn saint_default_is_pastel_not_high_contrast() {
-        let s = Theme::saint751();
-        // Escritorio claro + trabajo claro: la seña SAINT.
+    fn clipper_default_is_pastel_not_high_contrast() {
+        let s = Theme::clipper();
+        // Escritorio claro + trabajo claro: la seña de la época.
         assert_eq!(s.desktop, Color::Cyan);
         assert_eq!(s.work, Color::White);
         // Selección gris legible, no invertido quemante.
@@ -158,13 +158,13 @@ mod tests {
     }
 
     #[test]
-    fn turbo_differs_from_saint() {
-        assert_ne!(Theme::saint751(), Theme::turbo());
+    fn turbo_differs_from_clipper() {
+        assert_ne!(Theme::clipper(), Theme::turbo());
     }
 
     #[test]
     fn menu_active_is_black_bar() {
-        let t = Theme::saint751();
+        let t = Theme::clipper();
         let a = t.menu_attr(true);
         assert_eq!((a.fg, a.bg), (Color::White, Color::Black));
     }
