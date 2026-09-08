@@ -23,9 +23,9 @@ use tui90::{
     button_draw, button_width, check_key, draw_text, drive, dropdown_draw, dropdown_key,
     enter_screen, filedialog_draw, filedialog_key, fkey_bar_compact, folder, input_draw, input_key,
     leave_screen, list_key, listbox_draw, listbox_key, menubar_draw, progressbar_draw, radio_key,
-    status_bar, statusbar_draw, table_draw, table_key, top_bar, tuichart_draw, vscrollbar, window,
-    Alignment, Attr, Backend, Buffer, Cell, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle,
-    Color, CrosstermBackend, Dropdown, DropdownKey, FKeyDef, FKeyStyle, FileDialog, FileDialogKey,
+    statusbar_draw, table_draw, table_key, top_bar, tuichart_draw, vscrollbar, window, Alignment,
+    Attr, Backend, Buffer, Cell, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color,
+    CrosstermBackend, Dropdown, DropdownKey, FKeyDef, FKeyStyle, FileDialog, FileDialogKey,
     FolderGlyphs, GlyphSet, HotAttrs, InputField, InputKey, ListBox, MenuDef, RadioNav, Rect,
     Screen, StatusBar, TableDef, TableState, Theme, TuiChart, WindowOpts,
 };
@@ -264,13 +264,13 @@ impl Show {
         self.status.columns.clear();
         self.col_msg = self
             .status
-            .add_column(1, w.saturating_sub(38).max(10), Alignment::Left);
+            .add_column(1, w.saturating_sub(34).max(10), Alignment::Left);
         self.col_focus = self
             .status
-            .add_column(w.saturating_sub(36), 14, Alignment::Center);
+            .add_column(w.saturating_sub(32), 14, Alignment::Center);
         self.col_info = self
             .status
-            .add_column(w.saturating_sub(20), 19, Alignment::Right);
+            .add_column(w.saturating_sub(16), 15, Alignment::Right);
         self.status_w = w;
     }
 
@@ -307,17 +307,8 @@ impl Show {
             cf,
             &format!("[{}]", FOCUS_NAMES[focus.min(FOCUS_NAMES.len() - 1)]),
         );
-        self.status.set_text(
-            ci,
-            &format!(
-                "{}% F4:Graphs",
-                self.listbox
-                    .items
-                    .get(self.listbox.selected)
-                    .map(String::as_str)
-                    .unwrap_or("—")
-            ),
-        );
+        // Columna derecha fija: atajo de ayuda (nunca se trunca: 13 <= 15).
+        self.status.set_text(ci, "Alt-F1: Ayuda");
         let status = self.status.clone();
         let active_menu = 3usize;
         let tree_vis = lay.tree_panel.h.saturating_sub(2).max(1) as usize;
@@ -447,13 +438,12 @@ impl Show {
             }
         }
 
-        // F-bar compacta (F¹Help F²Qview…) + StatusBar avanzada + status.
-        if bounds.h >= 4 {
+        // Dos filas fijas al final, sin duplicados:
+        // h-2 = StatusBar por columnas, h-1 = teclas de función.
+        if bounds.h >= 3 {
             let fstyle = FKeyStyle::highlight(Color::Yellow, Color::White, Color::DarkGrey);
-            fkey_bar_compact(buf, bounds.h - 3, &fkey_refs, fstyle);
-            // StatusBar justo por encima de las teclas de función.
-            statusbar_draw(buf, bounds.h - 4, &status);
-            status_bar(buf, &msg, "Alt-F1: Ayuda", t);
+            fkey_bar_compact(buf, bounds.h - 1, &fkey_refs, fstyle);
+            statusbar_draw(buf, bounds.h - 2, &status);
         }
 
         if charts_view {

@@ -193,19 +193,20 @@ pub fn button_draw_opts(
         buf.set(bx.saturating_add(w), by, Cell::with_attr(' ', battr));
     }
     if !pressed && opts.has_shadow {
-        // Sombra CUA exacta por celdas (botón en `(bx, by)`, `W` x `H=1`):
-        // - lateral derecha: EXACTAMENTE `(x_end, y)` = `(bx+w, by)`,
-        // - inferior: `(x_start+1, y+1)` .. `(x_end, y+1)` inclusive
-        //   (el rango ya incluye la esquina `(bx+w, by+1)` que cierra la L).
-        // Sin `\n` ni celdas extra: mezcla del fondo existente.
-        blend_shadow(buf, bx.saturating_add(w), by, theme);
-        for i in 0..w {
-            blend_shadow(
-                buf,
-                bx.saturating_add(i).saturating_add(1),
-                by.saturating_add(1),
-                theme,
-            );
+        // Sombra CUA exacta (spec §3), sin filas/celdas extra:
+        // botón en fila `by`, de `x_start = bx` a `x_end = bx + w` (`H = 1`).
+        // 1. El cuerpo ya se dibujó arriba de forma normal.
+        // 2. Lateral derecha: EXACTAMENTE `(x_end, y)`.
+        // 3. Inferior: `(x_start + 1)..=(x_end)` en `y + 1` (inclusivo:
+        //    incluye la esquina que cierra la L).
+        // Cada celda mezcla: conserva el carácter de fondo y solo fuerza
+        // `bg` a negro + `dim` (equivale al `buffer[y*w+x]` del spec con
+        // chequeo de bordes en vez de `idx < buffer.len()`).
+        let x_start = bx;
+        let x_end = bx.saturating_add(w);
+        blend_shadow(buf, x_end, by, theme);
+        for sx in x_start.saturating_add(1)..=x_end {
+            blend_shadow(buf, sx, by.saturating_add(1), theme);
         }
     }
     w
@@ -264,23 +265,27 @@ mod tests {
         // Fondo con glifo para verificar mezcla (no borra).
         b.text(12, 1, "Z", Color::Black, t.desktop);
         b.text(12, 2, "Y", Color::Black, t.desktop);
-        let w = button(&mut b, 2, 1, "Salir", t);
+        let (x, y) = (2u16, 1u16);
+        let w = button(&mut b, x, y, "Salir", t);
         assert_eq!(w, BUTTON_MIN_WIDTH);
+        let (x_start, x_end) = (x, x.saturating_add(w));
         assert_eq!(b.get(2, 1).unwrap().bg, t.button_bg);
-        // Sombra inferior corrida +1, mezclada.
-        let c = b.get(3, 2).unwrap();
-        assert_eq!(c.bg, t.shadow);
-        assert!(c.dim);
-        // Sombra lateral CUA: última columna +1, misma fila, mezclada.
-        let side = b.get(2 + 10, 1).unwrap();
+        // Paso 2 del spec: lateral EXACTAMENTE `(x_end, y)`, mezclada.
+        let side = b.get(x_end, y).unwrap();
         assert_eq!(side.ch, 'Z'); // conserva glifo
         assert_eq!(side.bg, t.shadow);
         assert!(side.dim);
-        // Esquina (x+W, y+H): cierra la L, también mezclada.
-        let corner = b.get(2 + 10, 2).unwrap();
+        // Paso 3 del spec: rango COMPLETO `(x_start+1)..=(x_end)` en `y+1`.
+        for sx in x_start.saturating_add(1)..=x_end {
+            let c = b.get(sx, y.saturating_add(1)).unwrap();
+            assert_eq!(c.bg, t.shadow, "sombra en ({sx}, 2)");
+            assert!(c.dim);
+        }
+        // Esquina `(x_end, y+1)` = fin del rango: cierra la L, mezclada.
+        let corner = b.get(x_end, y.saturating_add(1)).unwrap();
         assert_eq!(corner.ch, 'Y');
-        assert_eq!(corner.bg, t.shadow);
-        assert!(corner.dim);
+        // Fuera del rango: fondo intacto (nada extra a la izquierda).
+        assert_eq!(b.get(x_start, y.saturating_add(1)).unwrap().bg, t.desktop);
     }
 
     #[test]

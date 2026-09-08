@@ -21,12 +21,12 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 
 | Función | Parámetros | Devuelve | Efecto |
 |---|---|---|---|
-| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | bloque + título centrado + sombra + caja `[■]` (`\u{25a0}`) en relativo `(x=2,y=0)` opt |
+| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | bloque + título centrado + sombra mezclada + caja `[■]` (`\u{25a0}`) incrustada en `x+1,x+2,x+3` opt |
 | `WindowOpts::modal/form/dialog(título, theme)` | `&str`, `Theme` | `WindowOpts` | presets gris/negro/menta (`.controls`, `.shadow_style`, `.border_color` opt, `.shadow`=`has_shadow`) |
 | `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra fantasma (offset 2,1): conserva glifo+color, atenúa con `dim` ANSI |
 | `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes (botones = sólida) |
 | `Cell.dim` / `Attr::faint` | flag | — | `\x1b[2m` real en el backend |
-| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal, padding 2 por lado (`  TEXTO  `, mín. 10), sombra CUA exacta `(x_end,y)` + `(x_start+1..x_end, y+1)` mezclada |
+| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal, padding 2 por lado (`  TEXTO  `, mín. 10); sombra exacta: `(x_end,y)` + `(x_start+1..=x_end, y+1)`, mezcla (glifo intacto, `bg` negro + `dim`), sin celdas extra |
 | `button_draw(..., pressed)` | + `bool` | `u16` ancho | hundido (+1,+1, sin sombra) si `pressed` |
 | `button_ex / button_draw_ex / button_draw_opts` | + `ButtonOpts` | `u16` ancho | estilo global (`foreground/background/border_color`, `has_shadow`) |
 | `button_width(label)` | `&str` | `u16` | texto+4 con mínimo 10 |
@@ -66,7 +66,8 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `fkey_bar_styled(buf, y, keys, FKeyStyle)` | `FKeyStyle{key_fg/bg, label_fg/bg, has_shadow}` | a) cantidad b) etiquetas d/e) colores |
 | `fkey_bar_stacked(buf, y, keys, style)` | 2 filas | F sobre el número, alineados |
 | `fkey_bar_compact(buf, y, keys, style)` | 1 fila | `F¹Help F²Qview F¹⁰Menu` (F + superíndice) |
-| `statusbar_draw(buf, y, bar)` | `StatusBar` + `add_column(start_col, max_len, Alignment)` | penúltima fila por secciones; `set_text(i)` dinámico |
+| `statusbar_draw(buf, y, bar)` | `StatusBar` + `add_column(start_col, max_len, Alignment)` | penúltima fila (h-2) por secciones; `set_text(i)` dinámico; última fila (h-1) solo F-keys; prohibido duplicar barras |
+| `win_close(buf, x, y, ...)` | — | `u16`=3 | `[■]` (`\u{25a0}`) parte del borde superior, no flotante |
 | `filedialog_draw(buf, screen, dlg, theme)` | `FileDialog::new(&ruta)` (`std::fs`, árbol + `ListBox`) | `filedialog_key` → `Accepted(PathBuf)` / `Cancelled`; Enter entra/elige, Bksp sube |
 | `textarea_draw(buf, rect, area, focused)` | `TextArea{lines, cursor, max_chars, fg/bg/active_bg, border_color, has_shadow}` | `textarea_key` → Enter parte línea, flechas/PgUp/PgDn navegan, scroll vertical |
 | `hyperlink_draw(buf, x, y, link)` | `Hyperlink{text, url}` | texto negrita coloreado; `osc8_sequence()` = `\x1b]8;;URL\x1b\\TEXTO\x1b]8;;\x1b\\` clickeable |

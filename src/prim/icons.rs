@@ -69,8 +69,8 @@ pub fn drive(buf: &mut Buffer, x: u16, y: u16, letter: char, attr: Attr, accent:
     4
 }
 
-/// Caja de cierre `[■]` (`\u{25a0}`) para barras de título, en `(x, y)`.
-/// Típico: relativo `(x=2, y=0)` de la ventana. Devuelve 3.
+/// Caja de cierre `[■]` (`\u{25a0}`) para el borde superior, en `(x, y)`.
+/// Típico: esquina de ventana en `(x-1, y)` (ocupa x, x+1, x+2). Devuelve 3.
 pub fn win_close(buf: &mut Buffer, x: u16, y: u16, attr: Attr, accent: Color) -> u16 {
     buf.set(x, y, Cell::with_attr('[', attr));
     buf.set(
