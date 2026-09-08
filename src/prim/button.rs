@@ -22,6 +22,8 @@ use super::label::visible_len;
 pub const BUTTON_MIN_WIDTH: u16 = 10;
 
 /// Configuración de un botón (los 4 parámetros globales; `None` = tema).
+/// `border_color`: `Some` pinta corchetes `[ ]` integrados en la única
+/// fila (sin filas extra); `None` = bloque sólido.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ButtonOpts {
     pub foreground_color: Option<Color>,
@@ -150,18 +152,24 @@ pub fn button_draw_opts(
     if w == 0 {
         return 0;
     }
-    // Hundido: corre el bloque y no pintes sombra (queda tapada).
+
+    // Si está presionado se desplaza para el efecto de hundido
     let (bx, by) = if pressed {
         (x.saturating_add(1), y.saturating_add(1))
     } else {
         (x, y)
     };
+
     let attr = resolve_attr(theme, opts);
-    // Bloque + texto centrado.
+
+    // 1. DIBUJAR CUERPO DEL BOTÓN (Estrictamente 1 fila de alto)
+    // Rellenamos el fondo del botón con espacios
     buf.fill_rect(
         crate::core::Rect::new(bx, by, w, 1),
         Cell::with_attr(' ', attr),
     );
+
+    // Centrar y renderizar el texto dentro de esa única fila
     let text = visible_len(label);
     let start = bx.saturating_add(w.saturating_sub(text) / 2);
     let mut cx = start;
@@ -172,47 +180,29 @@ pub fn button_draw_opts(
         buf.set(cx, by, Cell::with_attr(ch, attr));
         cx = cx.saturating_add(1);
     }
-    // Borde opt-in: marco de 1 celda alrededor (no cambia el ancho devuelto).
-    let has_border = opts.border_color.is_some();
-    if let Some(border) = opts.border_color {
-        let battr = Attr::new(border, border);
-        for i in 0..w.saturating_add(2) {
-            buf.set(
-                bx.saturating_sub(1).saturating_add(i),
-                by.saturating_sub(1),
-                Cell::with_attr(' ', battr),
-            );
-        }
-        for i in 0..w.saturating_add(2) {
-            buf.set(
-                bx.saturating_sub(1).saturating_add(i),
-                by.saturating_add(1),
-                Cell::with_attr(' ', battr),
-            );
-        }
-        buf.set(bx.saturating_sub(1), by, Cell::with_attr(' ', battr));
-        buf.set(bx.saturating_add(w), by, Cell::with_attr(' ', battr));
+
+    // ELIMINAMOS los bucles for antiguos que inflaban el botón arriba y abajo.
+    // 2. BORDE INTEGRADO OPCIONAL (Solo si se requiere una línea fina, NO celdas vacías extras)
+    if let Some(_border) = opts.border_color {
+        // Si necesitas un recuadro de línea fina estilo [ OK ], pinta los corchetes en los extremos
+        buf.set(bx, by, Cell::with_attr('[', attr));
+        buf.set(
+            bx.saturating_add(w).saturating_sub(1),
+            by,
+            Cell::with_attr(']', attr),
+        );
     }
-    // CÁLCULO QUIRÚRGICO DE LA SOMBRA (Ajustado según la presencia de bordes)
+
+    // 3. GEOMETRÍA PIXEL-PERFECT DE LA SOMBRA (Estilo PC Tools)
     if !pressed && opts.has_shadow {
-        // Si hay borde, la sombra debe desplazarse 1 celda más hacia afuera
-        let border_offset = if has_border { 1 } else { 0 };
+        let x_end = bx.saturating_add(w);
 
-        let x_start = bx.saturating_sub(border_offset);
-        let x_end = bx.saturating_add(w).saturating_add(border_offset);
-        let shadow_y = by.saturating_add(1).saturating_add(border_offset);
+        // Sombra lateral derecha: Justo 1 celda a la derecha del botón
+        blend_shadow(buf, x_end, by, theme);
 
-        // 1. Sombra lateral derecha (Cubre el alto del botón incluyendo su borde si tiene)
-        let shadow_x_right = x_end;
-        blend_shadow(buf, shadow_x_right, by, theme);
-        if has_border {
-            blend_shadow(buf, shadow_x_right, by.saturating_sub(1), theme);
-            blend_shadow(buf, shadow_x_right, by.saturating_add(1), theme);
-        }
-
-        // 2. Sombra inferior (Desplazada una celda a la derecha del inicio real)
-        for sx in x_start.saturating_add(1)..=x_end {
-            blend_shadow(buf, sx, shadow_y, theme);
+        // Sombra inferior: Justo en la fila de abajo, desplazada un carácter a la derecha
+        for sx in bx.saturating_add(1)..=x_end {
+            blend_shadow(buf, sx, by.saturating_add(1), theme);
         }
     }
 
@@ -340,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    fn border_pushes_shadow_outward() {
+    fn border_is_inline_one_row_no_extra_cells() {
         use crate::core::Color;
         let t = Theme::clipper();
         let mut b = Buffer::blank(30, 8, t.desktop);
@@ -349,22 +339,20 @@ mod tests {
             ..ButtonOpts::default()
         };
         let w = button_ex(&mut b, 4, 2, "OK", t, opts);
-        // Borde inferior intacto (la sombra ya NO lo pisa).
-        for x in 3..4 + w + 1 {
-            assert_eq!(b.get(x, 3).unwrap().bg, Color::Red, "borde en ({x}, 3)");
+        // Corchetes integrados en la ÚNICA fila, sin filas extra arriba/abajo.
+        assert_eq!(b.get(4, 2).unwrap().ch, '[');
+        assert_eq!(b.get(4 + w - 1, 2).unwrap().ch, ']');
+        assert_eq!(b.get(4, 1).unwrap().bg, t.desktop); // nada arriba
+                                                        // Sombra pegada abajo (by+1), sin offset: el borde no la desplaza.
+        for x in 5..=4 + w {
+            assert_eq!(b.get(x, 3).unwrap().bg, t.shadow, "sombra en ({x}, 3)");
         }
-        // Sombra desplazada a by+2 con el mismo principio de mezcla.
-        for x in 4..=4 + w + 1 {
-            assert_eq!(b.get(x, 4).unwrap().bg, t.shadow, "sombra en ({x}, 4)");
-        }
-        // Lateral derecha cubre el alto con borde (by-1, by, by+1).
-        assert_eq!(b.get(4 + w + 1, 1).unwrap().bg, t.shadow);
-        assert_eq!(b.get(4 + w + 1, 2).unwrap().bg, t.shadow);
-        assert_eq!(b.get(4 + w + 1, 3).unwrap().bg, t.shadow);
+        // Lateral a 1 celda, misma fila.
+        assert_eq!(b.get(4 + w, 2).unwrap().bg, t.shadow);
     }
 
     #[test]
-    fn border_draws_frame_around() {
+    fn border_draws_inline_brackets() {
         let t = Theme::clipper();
         let mut b = Buffer::blank(30, 6, t.desktop);
         let opts = ButtonOpts {
@@ -372,8 +360,10 @@ mod tests {
             ..ButtonOpts::default()
         };
         button_ex(&mut b, 2, 2, "OK", t, opts);
-        assert_eq!(b.get(1, 1).unwrap().bg, Color::Red); // arriba-izq
-        assert_eq!(b.get(1, 2).unwrap().bg, Color::Red); // lateral
-        assert_eq!(b.get(2, 2).unwrap().bg, t.button_bg); // botón intacto
+        // 1 sola fila: `[` al inicio, `]` al final, texto intacto dentro.
+        assert_eq!(b.get(2, 2).unwrap().ch, '[');
+        assert_eq!(b.get(2 + 10 - 1, 2).unwrap().ch, ']');
+        assert_eq!(b.get(2 + (10 - 2) / 2, 2).unwrap().ch, 'O');
+        assert_eq!(b.get(2, 1).unwrap().bg, t.desktop); // sin fila extra
     }
 }
