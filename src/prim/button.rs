@@ -194,35 +194,23 @@ pub fn button_draw_opts(
     }
 
     // 3. GEOMETRÍA DE LA SOMBRA: exclusivamente inferior (1 fila de alto
-    // no lleva lateral derecha).
+    // no lleva lateral derecha). Truco PC Tools: medio bloque inferior
+    // `▄` (`\u{2584}`) con texto negro sobre el fondo existente — la mitad
+    // superior funde con la ventana y solo se ve una fina línea negra.
     if !pressed && opts.has_shadow {
         let x_end = bx.saturating_add(w);
         // Sombra inferior: Solo abajo, corrida un carácter a la derecha
+        let below = by.saturating_add(1);
         for sx in bx.saturating_add(1)..=x_end {
-            blend_shadow(buf, sx, by.saturating_add(1), theme);
+            if !buf.in_bounds(sx, below) {
+                continue;
+            }
+            let old = buf.get(sx, below).unwrap_or(Cell::blank(theme.shadow));
+            buf.set(sx, below, Cell::new('\u{2584}', Color::Black, old.bg));
         }
     }
 
     w
-}
-
-/// Mezcla de sombra: conserva glifo+fg, fuerza bg negro + `dim`.
-fn blend_shadow(buf: &mut Buffer, x: u16, y: u16, theme: Theme) {
-    if !buf.in_bounds(x, y) {
-        return;
-    }
-    let old = buf.get(x, y).unwrap_or(Cell::blank(theme.shadow));
-    buf.set(
-        x,
-        y,
-        Cell {
-            ch: old.ch,
-            fg: old.fg,
-            bg: theme.shadow,
-            bold: false,
-            dim: true,
-        },
-    );
 }
 
 #[cfg(test)]
@@ -269,15 +257,17 @@ mod tests {
         assert_eq!(side.ch, 'Z');
         assert_eq!(side.bg, t.desktop);
         assert!(!side.dim);
-        // Paso 3 del spec: rango COMPLETO `(x_start+1)..=(x_end)` en `y+1`.
+        // Paso 3 del spec: rango COMPLETO `(x_start+1)..=(x_end)` en `y+1`,
+        // truco `▄`: texto negro sobre el fondo existente (funde arriba).
         for sx in x_start.saturating_add(1)..=x_end {
             let c = b.get(sx, y.saturating_add(1)).unwrap();
-            assert_eq!(c.bg, t.shadow, "sombra en ({sx}, 2)");
-            assert!(c.dim);
+            assert_eq!(c.ch, '\u{2584}', "medio bloque en ({sx}, 2)");
+            assert_eq!(c.fg, Color::Black);
+            assert_eq!(c.bg, t.desktop);
         }
-        // Esquina `(x_end, y+1)` = fin del rango: cierra la L, mezclada.
+        // Esquina `(x_end, y+1)` = fin del rango: cierra la L.
         let corner = b.get(x_end, y.saturating_add(1)).unwrap();
-        assert_eq!(corner.ch, 'Y');
+        assert_eq!(corner.ch, '\u{2584}');
         // Fuera del rango: fondo intacto (nada extra a la izquierda).
         assert_eq!(b.get(x_start, y.saturating_add(1)).unwrap().bg, t.desktop);
     }
@@ -340,9 +330,12 @@ mod tests {
         assert_eq!(b.get(4, 2).unwrap().ch, '[');
         assert_eq!(b.get(4 + w - 1, 2).unwrap().ch, ']');
         assert_eq!(b.get(4, 1).unwrap().bg, t.desktop); // nada arriba
-                                                        // Sombra pegada abajo (by+1), sin offset: el borde no la desplaza.
+                                                        // Sombra `▄` abajo (by+1): texto negro sobre el fondo intacto.
         for x in 5..=4 + w {
-            assert_eq!(b.get(x, 3).unwrap().bg, t.shadow, "sombra en ({x}, 3)");
+            let c = b.get(x, 3).unwrap();
+            assert_eq!(c.ch, '\u{2584}', "medio bloque en ({x}, 3)");
+            assert_eq!(c.fg, Color::Black);
+            assert_eq!(c.bg, t.desktop);
         }
         // Sin lateral derecha: la celda contigua conserva el fondo.
         assert_eq!(b.get(4 + w, 2).unwrap().bg, t.desktop);
