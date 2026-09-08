@@ -26,7 +26,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra fantasma (offset 2,1): conserva glifo+color, atenúa con `dim` ANSI |
 | `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes (botones = sólida) |
 | `Cell.dim` / `Attr::faint` | flag | — | `\x1b[2m` real en el backend |
-| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal 1 fila, padding 2 por lado (`  TEXTO  `, mín. 10); sombra solo inferior `(x_start+1..=x_end, y+1)` con `▄` (`\u{2584}`) negro sobre el fondo intacto |
+| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal 1 fila, padding 2 por lado (`  TEXTO  `, mín. 10); sombra media celda: lateral `▄` (`\u{2584}`) + inferior `▀` (`\u{2580}`), tinta negra sobre `window_bg` |
 | `button_draw(..., pressed)` | + `bool` | `u16` ancho | hundido (+1,+1, sin sombra) si `pressed` |
 | `button_ex / button_draw_ex / button_draw_opts` | + `ButtonOpts` | `u16` ancho | estilo global (`foreground/background/border_color`, `has_shadow`) |
 | `button_width(label)` | `&str` | `u16` | texto+4 con mínimo 10 |

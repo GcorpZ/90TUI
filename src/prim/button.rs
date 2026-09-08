@@ -161,9 +161,12 @@ pub fn button_draw_opts(
     };
 
     let attr = resolve_attr(theme, opts);
+    let window_bg = theme.window_bg; // Fondo base de ventana para la ilusión óptica
 
-    // 1. DIBUJAR CUERPO DEL BOTÓN (Estrictamente 1 fila de alto)
-    // Rellenamos el fondo del botón con espacios
+    // ----------------------------------------------------------------
+    // FILA 1: CUERPO DEL BOTÓN + SOMBRA LATERAL MITAD INFERIOR
+    // ----------------------------------------------------------------
+    // Pinar el rectángulo del botón (1 fila de alto)
     buf.fill_rect(
         crate::core::Rect::new(bx, by, w, 1),
         Cell::with_attr(' ', attr),
@@ -193,20 +196,47 @@ pub fn button_draw_opts(
         );
     }
 
-    // 3. GEOMETRÍA DE LA SOMBRA: exclusivamente inferior (1 fila de alto
-    // no lleva lateral derecha). Truco PC Tools: medio bloque inferior
-    // `▄` (`\u{2584}`) con texto negro sobre el fondo existente — la mitad
-    // superior funde con la ventana y solo se ve una fina línea negra.
+    // SI NO ESTÁ PRESIONADO, DIBUJAMOS LA ILUSIÓN ÓPTICA DE LA SOMBRA DE MEDIA CELDA
     if !pressed && opts.has_shadow {
         let x_end = bx.saturating_add(w);
-        // Sombra inferior: Solo abajo, corrida un carácter a la derecha
-        let below = by.saturating_add(1);
+
+        // A. SOMBRA LATERAL DER (Fila 1): `▄` (`\u{2584}`), tinta negra abajo,
+        // fondo de ventana arriba.
+        if buf.in_bounds(x_end, by) {
+            buf.set(
+                x_end,
+                by,
+                Cell {
+                    ch: '\u{2584}',
+                    fg: Color::Black,
+                    bg: window_bg,
+                    bold: false,
+                    dim: false,
+                },
+            );
+        }
+
+        // ----------------------------------------------------------------
+        // FILA 2: SOMBRA INFERIOR DE MEDIA ALTURA (Pegada a la base)
+        // ----------------------------------------------------------------
+        // Desde bx + 1 hasta x_end inclusive: base + esquina.
+        // `▀` (`\u{2580}`): tinta negra arriba (pegada al botón),
+        // fondo de ventana abajo.
+        let shadow_y = by.saturating_add(1);
         for sx in bx.saturating_add(1)..=x_end {
-            if !buf.in_bounds(sx, below) {
-                continue;
+            if buf.in_bounds(sx, shadow_y) {
+                buf.set(
+                    sx,
+                    shadow_y,
+                    Cell {
+                        ch: '\u{2580}',
+                        fg: Color::Black,
+                        bg: window_bg,
+                        bold: false,
+                        dim: false,
+                    },
+                );
             }
-            let old = buf.get(sx, below).unwrap_or(Cell::blank(theme.shadow));
-            buf.set(sx, below, Cell::new('\u{2584}', Color::Black, old.bg));
         }
     }
 
@@ -240,34 +270,27 @@ mod tests {
     }
 
     #[test]
-    fn draws_teal_block_with_cua_shadow() {
+    fn draws_teal_block_with_pc_tools_shadow() {
         use crate::core::Color;
         let t = Theme::clipper();
         let mut b = Buffer::blank(30, 6, t.desktop);
-        // Fondo con glifo para verificar mezcla (no borra).
-        b.text(12, 1, "Z", Color::Black, t.desktop);
-        b.text(12, 2, "Y", Color::Black, t.desktop);
         let (x, y) = (2u16, 1u16);
         let w = button(&mut b, x, y, "Salir", t);
         assert_eq!(w, BUTTON_MIN_WIDTH);
         let (x_start, x_end) = (x, x.saturating_add(w));
         assert_eq!(b.get(2, 1).unwrap().bg, t.button_bg);
-        // Sin lateral derecha: la celda `(x_end, y)` conserva el fondo.
+        // A. Lateral `(x_end, y)`: `▄` negro sobre fondo de ventana.
         let side = b.get(x_end, y).unwrap();
-        assert_eq!(side.ch, 'Z');
-        assert_eq!(side.bg, t.desktop);
-        assert!(!side.dim);
-        // Paso 3 del spec: rango COMPLETO `(x_start+1)..=(x_end)` en `y+1`,
-        // truco `▄`: texto negro sobre el fondo existente (funde arriba).
+        assert_eq!(side.ch, '\u{2584}');
+        assert_eq!(side.fg, Color::Black);
+        assert_eq!(side.bg, t.window_bg);
+        // B. Inferior `(x_start+1)..=(x_end)` en `y+1`: `▀` negro arriba.
         for sx in x_start.saturating_add(1)..=x_end {
             let c = b.get(sx, y.saturating_add(1)).unwrap();
-            assert_eq!(c.ch, '\u{2584}', "medio bloque en ({sx}, 2)");
+            assert_eq!(c.ch, '\u{2580}', "medio bloque sup en ({sx}, 2)");
             assert_eq!(c.fg, Color::Black);
-            assert_eq!(c.bg, t.desktop);
+            assert_eq!(c.bg, t.window_bg);
         }
-        // Esquina `(x_end, y+1)` = fin del rango: cierra la L.
-        let corner = b.get(x_end, y.saturating_add(1)).unwrap();
-        assert_eq!(corner.ch, '\u{2584}');
         // Fuera del rango: fondo intacto (nada extra a la izquierda).
         assert_eq!(b.get(x_start, y.saturating_add(1)).unwrap().bg, t.desktop);
     }
@@ -330,15 +353,15 @@ mod tests {
         assert_eq!(b.get(4, 2).unwrap().ch, '[');
         assert_eq!(b.get(4 + w - 1, 2).unwrap().ch, ']');
         assert_eq!(b.get(4, 1).unwrap().bg, t.desktop); // nada arriba
-                                                        // Sombra `▄` abajo (by+1): texto negro sobre el fondo intacto.
+                                                        // Sombra `▀` abajo (by+1): tinta negra, fondo de ventana.
         for x in 5..=4 + w {
             let c = b.get(x, 3).unwrap();
-            assert_eq!(c.ch, '\u{2584}', "medio bloque en ({x}, 3)");
+            assert_eq!(c.ch, '\u{2580}', "medio bloque sup en ({x}, 3)");
             assert_eq!(c.fg, Color::Black);
-            assert_eq!(c.bg, t.desktop);
+            assert_eq!(c.bg, t.window_bg);
         }
-        // Sin lateral derecha: la celda contigua conserva el fondo.
-        assert_eq!(b.get(4 + w, 2).unwrap().bg, t.desktop);
+        // Lateral `▄` en la misma fila.
+        assert_eq!(b.get(4 + w, 2).unwrap().ch, '\u{2584}');
     }
 
     #[test]
