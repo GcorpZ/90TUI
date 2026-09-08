@@ -193,14 +193,11 @@ pub fn button_draw_opts(
         );
     }
 
-    // 3. GEOMETRÍA PIXEL-PERFECT DE LA SOMBRA (Estilo PC Tools)
+    // 3. GEOMETRÍA DE LA SOMBRA: exclusivamente inferior (1 fila de alto
+    // no lleva lateral derecha).
     if !pressed && opts.has_shadow {
         let x_end = bx.saturating_add(w);
-
-        // Sombra lateral derecha: Justo 1 celda a la derecha del botón
-        blend_shadow(buf, x_end, by, theme);
-
-        // Sombra inferior: Justo en la fila de abajo, desplazada un carácter a la derecha
+        // Sombra inferior: Solo abajo, corrida un carácter a la derecha
         for sx in bx.saturating_add(1)..=x_end {
             blend_shadow(buf, sx, by.saturating_add(1), theme);
         }
@@ -267,11 +264,11 @@ mod tests {
         assert_eq!(w, BUTTON_MIN_WIDTH);
         let (x_start, x_end) = (x, x.saturating_add(w));
         assert_eq!(b.get(2, 1).unwrap().bg, t.button_bg);
-        // Paso 2 del spec: lateral EXACTAMENTE `(x_end, y)`, mezclada.
+        // Sin lateral derecha: la celda `(x_end, y)` conserva el fondo.
         let side = b.get(x_end, y).unwrap();
-        assert_eq!(side.ch, 'Z'); // conserva glifo
-        assert_eq!(side.bg, t.shadow);
-        assert!(side.dim);
+        assert_eq!(side.ch, 'Z');
+        assert_eq!(side.bg, t.desktop);
+        assert!(!side.dim);
         // Paso 3 del spec: rango COMPLETO `(x_start+1)..=(x_end)` en `y+1`.
         for sx in x_start.saturating_add(1)..=x_end {
             let c = b.get(sx, y.saturating_add(1)).unwrap();
@@ -347,8 +344,8 @@ mod tests {
         for x in 5..=4 + w {
             assert_eq!(b.get(x, 3).unwrap().bg, t.shadow, "sombra en ({x}, 3)");
         }
-        // Lateral a 1 celda, misma fila.
-        assert_eq!(b.get(4 + w, 2).unwrap().bg, t.shadow);
+        // Sin lateral derecha: la celda contigua conserva el fondo.
+        assert_eq!(b.get(4 + w, 2).unwrap().bg, t.desktop);
     }
 
     #[test]
