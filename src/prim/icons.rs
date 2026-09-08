@@ -69,13 +69,14 @@ pub fn drive(buf: &mut Buffer, x: u16, y: u16, letter: char, attr: Attr, accent:
     4
 }
 
-/// Caja de cierre `[■]` para barras de título. Devuelve 3.
+/// Caja de cierre `[■]` (`\u{25a0}`) para barras de título, en `(x, y)`.
+/// Típico: `(x+1, y)` de la barra. Devuelve 3.
 pub fn win_close(buf: &mut Buffer, x: u16, y: u16, attr: Attr, accent: Color) -> u16 {
     buf.set(x, y, Cell::with_attr('[', attr));
     buf.set(
         x.saturating_add(1),
         y,
-        Cell::with_attr('■', Attr { fg: accent, ..attr }),
+        Cell::with_attr('\u{25a0}', Attr { fg: accent, ..attr }),
     );
     buf.set(x.saturating_add(2), y, Cell::with_attr(']', attr));
     3
@@ -130,7 +131,7 @@ mod tests {
         let mut b = Buffer::blank(20, 4, t.desktop);
         assert_eq!(win_close(&mut b, 1, 1, a, Color::Yellow), 3);
         assert_eq!(win_min(&mut b, 5, 1, a), 3);
-        assert_eq!(b.get(2, 1).unwrap().ch, '■');
+        assert_eq!(b.get(2, 1).unwrap().ch, '\u{25a0}');
         assert_eq!(b.get(6, 1).unwrap().ch, '-');
     }
 }

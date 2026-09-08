@@ -10,20 +10,26 @@ colores siempre vía `Theme` (nunca literales), todo dibuja sobre
 `Buffer`/`Screen` (apilable con `savescreen`), toda navegación es pura
 (`*_key`, testeable sin terminal). Fuente recomendada con `─ │ ├ └ ─
 ◄ ▲ ▼ … ○ ● ☐ ☑ ■ ►` (DejaVu, Cascadia, Consolas).
+Parámetros globales de estilo (`core::WidgetStyle`, colores `Color` 16 ANSI,
+no RGB): `foreground_color` / `background_color` / `border_color` /
+`has_shadow` — presentes en `ButtonOpts`, `WindowOpts` (`shadow` +
+`border_color`), `CheckStyle`, `FKeyStyle` (`has_shadow`), `Dropdown`,
+`InputField`, `ProgressBar` y `ListBox`.
 
 ## prim — primitivas de dibujo (`tui90::prim`)
 
 | Función | Parámetros | Devuelve | Efecto |
 |---|---|---|---|
-| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | bloque + título centrado + sombra + caja `[■]` opt |
-| `WindowOpts::modal/form/dialog(título, theme)` | `&str`, `Theme` | `WindowOpts` | presets gris/negro/menta (`.controls`, `.shadow_style` ajustables) |
+| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | bloque + título centrado + sombra + caja `[■]` (`\u{25a0}`) en `(x+1,y)` opt |
+| `WindowOpts::modal/form/dialog(título, theme)` | `&str`, `Theme` | `WindowOpts` | presets gris/negro/menta (`.controls`, `.shadow_style`, `.border_color` opt, `.shadow`=`has_shadow`) |
 | `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra fantasma (offset 2,1): conserva glifo+color, atenúa con `dim` ANSI |
 | `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes (botones = sólida) |
 | `Cell.dim` / `Attr::faint` | flag | — | `\x1b[2m` real en el backend |
-| `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes de sombra |
-| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal + sombra solo-abajo |
+| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal, ancho mín. 10 centrado (largo: +2 por lado), sombra CUA mezclada |
 | `button_draw(..., pressed)` | + `bool` | `u16` ancho | hundido (+1,+1, sin sombra) si `pressed` |
-| `button_width(label)` | `&str` | `u16` | ancho para layout |
+| `button_ex / button_draw_ex / button_draw_opts` | + `ButtonOpts` | `u16` ancho | estilo global (`foreground/background/border_color`, `has_shadow`) |
+| `button_width(label)` | `&str` | `u16` | mín. 10, si supera: texto+4 |
+| `BUTTON_MIN_WIDTH` | const `= 10` | — | ancho mínimo de botón |
 | `draw_hot_label(buf, x, y, s, base, hot)` | texto con `&` | `u16` ancho | etiqueta con hotkey |
 | `draw_text / fit_text / visible_len / parse_hotkey / hot_key_of / base_on` | — | — | utilidades de texto y `…` |
 | `hsep(buf, y, x0, x1, fg, bg)` | coords, colores | — | separador fino `─` |
@@ -50,7 +56,11 @@ colores siempre vía `Theme` (nunca literales), todo dibuja sobre
 | `table_draw(buf, rect, def, state, footer, theme)` | `TableDef{headers, rows}` | `table_key(state, n, visible, code)`; `TableState{row, top}` |
 | `checkbox_draw(buf, x, y, item, focused, style)` | `CheckItem{label, checked}` | `check_key` → `Move/Toggled`; Espacio/letra alterna |
 | `radio_draw(buf, x, y, label, sel, focus, style)` | — | `radio_key` → `Select`; flechas eligen directo |
-| `CheckStyle::new(HotAttrs{base, hot}, GlyphSet::{modern, ascii})` | colores + glifos | `[✓]` U+2713 / `(•)` U+2022 o ASCII |
+| `CheckStyle::new(attrs, GlyphSet::{modern, ascii})` | colores + glifos | integrales `☐/☑` `○/◉` o ASCII con marcos (+`border_color`, `has_shadow` fila) |
+| `dropdown_draw(buf, rect, dd, theme)` | `Dropdown{options, selected_index, is_open, label, max_height, bg/fg/active_bg, border_color, has_shadow}` | cerrado: selección + `▼`; abierto: overlay + scroll + `dropdown_key` |
+| `input_draw(buf, rect, field, focused)` | `InputField{value, max_len, mask, cursor, fg/bg/active_bg, border_color, has_shadow}` | `input_key` → inserta/borra/mueve; máscara solo visual |
+| `progressbar_draw(buf, rect, bar)` | `ProgressBar{pct 0-100, fg/bg, border_color, has_shadow, show_pct}` | `█` `\u{2588}` / `░` `\u{2591}` + `NN%` si cabe |
+| `listbox_draw(buf, rect, lb)` | `ListBox{items, selected, top, fg/bg/highlight, border_color, has_shadow}` | scrollbar `▲`/`▼` + `█` proporcional; `listbox_key` (flechas/PgUp/PgDn/letra) |
 | `fkey_bar(buf, y, keys, theme)` | `&[(&str,&str)]` | 1 fila clásica |
 | `fkey_bar_styled(buf, y, keys, FKeyStyle)` | `FKeyStyle{key_fg/bg, label_fg/bg}` | a) cantidad b) etiquetas d/e) colores |
 | `fkey_bar_stacked(buf, y, keys, style)` | 2 filas | F sobre el número, alineados |

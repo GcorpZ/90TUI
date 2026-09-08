@@ -15,12 +15,14 @@ use crate::prim::{draw_text, visible_len};
 /// Colores de la botonera, por partes:
 /// a) cantidad = `keys.len()`, b) etiquetas = `keys[i].1`,
 /// d) color Fx = `key_*`, e) color etiqueta = `label_*`.
+/// `has_shadow` (parámetro global) pinta una fila de sombra mezclada debajo.
 #[derive(Clone, Copy, Debug)]
 pub struct FKeyStyle {
     pub key_fg: Color,
     pub key_bg: Color,
     pub label_fg: Color,
     pub label_bg: Color,
+    pub has_shadow: bool,
 }
 
 impl FKeyStyle {
@@ -31,6 +33,7 @@ impl FKeyStyle {
             key_bg: theme.button_bg,
             label_fg: theme.button_fg,
             label_bg: theme.button_bg,
+            has_shadow: false,
         }
     }
 
@@ -41,7 +44,14 @@ impl FKeyStyle {
             key_bg: bg,
             label_fg: label,
             label_bg: bg,
+            has_shadow: false,
         }
+    }
+
+    /// Con sombra mezclada debajo de la fila.
+    pub fn with_shadow(mut self, has_shadow: bool) -> Self {
+        self.has_shadow = has_shadow;
+        self
     }
 }
 
@@ -56,6 +66,7 @@ pub fn fkey_bar_styled(buf: &mut Buffer, y: u16, keys: &[(&str, &str)], style: F
         return 0;
     }
     let mut cx = 1u16;
+    let mut end = cx;
     for (k, label) in keys {
         let s = format!(" {k} {label} ");
         let w = visible_len(&s);
@@ -71,6 +82,13 @@ pub fn fkey_bar_styled(buf: &mut Buffer, y: u16, keys: &[(&str, &str)], style: F
             style_label(style),
         );
         cx = cx.saturating_add(w).saturating_add(2);
+        end = cx;
+    }
+    if style.has_shadow {
+        // Sombra mezclada corrida +1 bajo lo pintado.
+        for x in 2..end {
+            blend_below(buf, x, y);
+        }
     }
     cx
 }
@@ -108,6 +126,12 @@ pub fn fkey_bar_stacked(buf: &mut Buffer, y: u16, keys: &[(&str, &str)], style: 
         );
         cx = cx.saturating_add(w).saturating_add(2);
     }
+    if style.has_shadow {
+        let end = cx;
+        for x in 2..end {
+            blend_below(buf, x, y.saturating_add(1));
+        }
+    }
     cx
 }
 
@@ -131,9 +155,30 @@ fn style_label(s: FKeyStyle) -> Attr {
     Attr::new(s.label_fg, s.label_bg)
 }
 
-/// Fila compacta estilo referencia: número en superíndice + etiqueta.
-/// `F1 Help` → `¹Help`, `F10 Menu` → `¹⁰Menu`, `Esc Salir` tal cual.
-/// El número va en colores Fx (típico: invertidos o amarillos).
+/// Sombra mezclada en la fila inferior (conserva glifo, fuerza negro + dim).
+fn blend_below(buf: &mut Buffer, x: u16, y: u16) {
+    use crate::core::Cell;
+    let sy = y.saturating_add(1);
+    if !buf.in_bounds(x, sy) {
+        return;
+    }
+    let old = buf.get(x, sy).unwrap_or(Cell::blank(Color::Black));
+    buf.set(
+        x,
+        sy,
+        Cell {
+            ch: old.ch,
+            fg: old.fg,
+            bg: Color::Black,
+            bold: false,
+            dim: true,
+        },
+    );
+}
+
+/// Fila compacta estilo referencia: F + número en superíndice + etiqueta.
+/// `F1 Help` → `F¹Help`, `F10 Menu` → `F¹⁰Menu`, `Esc Salir` tal cual.
+/// La `F` y el número van en colores Fx; la etiqueta en colores de etiqueta.
 pub fn fkey_bar_compact(buf: &mut Buffer, y: u16, keys: &[(&str, &str)], style: FKeyStyle) -> u16 {
     if y >= buf.height() {
         return 0;
@@ -151,13 +196,21 @@ pub fn fkey_bar_compact(buf: &mut Buffer, y: u16, keys: &[(&str, &str)], style: 
         draw_text(buf, cx.saturating_add(visible_len(&num)), y, label, la);
         cx = cx.saturating_add(w).saturating_add(2);
     }
+    if style.has_shadow {
+        let end = cx;
+        for x in 2..end {
+            blend_below(buf, x, y);
+        }
+    }
     cx
 }
 
-/// `"F2"` → `"²"`, `"F10"` → `"¹⁰"`; lo demás tal cual.
+/// `"F2"` → `"F²"`, `"F10"` → `"F¹⁰"`; lo demás tal cual.
 fn compact_num(k: &str) -> String {
     match k.strip_prefix(&['F', 'f'][..]) {
-        Some(n) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => superscript_digits(n),
+        Some(n) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => {
+            format!("F{}", superscript_digits(n))
+        }
         _ => k.to_string(),
     }
 }
@@ -222,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn compact_uses_superscripts() {
+    fn compact_uses_f_superscripts() {
         let t = Theme::clipper();
         let mut buf = Buffer::blank(60, 25, t.desktop);
         let style = FKeyStyle::highlight(Color::Yellow, Color::White, t.desktop);
@@ -232,12 +285,15 @@ mod tests {
             &[("F2", "Help"), ("F10", "Menu"), ("Esc", "Salir")],
             style,
         );
-        assert_eq!(buf.get(1, 24).unwrap().ch, '²');
+        // `F²Help`: F + superíndice en color Fx.
+        assert_eq!(buf.get(1, 24).unwrap().ch, 'F');
         assert_eq!(buf.get(1, 24).unwrap().fg, Color::Yellow);
-        assert_eq!(buf.get(2, 24).unwrap().ch, 'H');
-        let x2 = 1 + 1 + 4 + 2; // ²Help + aire
-        assert_eq!(buf.get(x2, 24).unwrap().ch, '¹');
-        assert_eq!(buf.get(x2 + 1, 24).unwrap().ch, '⁰');
+        assert_eq!(buf.get(2, 24).unwrap().ch, '\u{00b2}');
+        assert_eq!(buf.get(3, 24).unwrap().ch, 'H');
+        let x2 = 1 + 2 + 4 + 2; // F²Help + aire
+        assert_eq!(buf.get(x2, 24).unwrap().ch, 'F');
+        assert_eq!(buf.get(x2 + 1, 24).unwrap().ch, '\u{00b9}');
+        assert_eq!(buf.get(x2 + 2, 24).unwrap().ch, '\u{2070}');
     }
 
     #[test]

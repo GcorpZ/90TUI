@@ -1,12 +1,14 @@
 //! Ejemplo `showroom`: todas las capacidades a la vista (estilo PCTools).
 //!
 //! Escritorio con menubar, iconos de unidad, panel de árbol con iconos de
-//! carpeta, panel de archivos con tabla + scrollbars, diálogo central con
-//! radios `(●)` + casillas `[☑]` + botones OK/Cancel con clic animado,
-//! F-bar apilada (F sobre el número) y status con mensajes.
+//! carpeta, panel de archivos con tabla + scrollbars y diálogo central con
+//! radios `○/◉` + casillas `☐/☑` + dropdown + inputs (texto/clave) +
+//! listbox con scrollbar + progressbar + botones OK/Cancel (ancho mínimo 10,
+//! sombra CUA, clic animado), F-bar compacta (`F¹Help…`) y status.
 //!
-//! Foco con Tab: árbol → archivos → radios → casillas → botones.
-//! Flechas mueven, Espacio alterna/elige, Enter acepta, Esc sale.
+//! Foco con Tab: árbol → archivos → dropdown → nombre → clave → radios A →
+//! radios B → casillas → lista → progreso → botones. Flechas mueven, Espacio
+//! alterna/elige, Enter acepta, Esc sale. En progreso: `←→` ajusta ±5.
 //!
 //! ```sh
 //! cargo run --example showroom
@@ -18,11 +20,13 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use tui90::{
-    button_draw, check_key, draw_text, drive, enter_screen, fkey_bar_compact, folder, leave_screen,
-    list_key, menubar_draw, radio_key, status_bar, table_draw, table_key, top_bar, vscrollbar,
-    window, Attr, Backend, Buffer, Cell, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend,
-    FKeyDef, FKeyStyle, FolderGlyphs, GlyphSet, HotAttrs, MenuDef, RadioNav, Rect, Screen,
-    TableDef, TableState, Theme, WindowOpts,
+    button_draw, button_width, check_key, draw_text, drive, dropdown_draw, dropdown_key,
+    enter_screen, fkey_bar_compact, folder, input_draw, input_key, leave_screen, list_key,
+    listbox_draw, listbox_key, menubar_draw, progressbar_draw, radio_key, status_bar, table_draw,
+    table_key, top_bar, vscrollbar, window, Attr, Backend, Buffer, Cell, CheckItem, CheckNav,
+    CheckStyle, Color, CrosstermBackend, Dropdown, DropdownKey, FKeyDef, FKeyStyle, FolderGlyphs,
+    GlyphSet, HotAttrs, InputField, InputKey, ListBox, MenuDef, RadioNav, Rect, Screen, TableDef,
+    TableState, Theme, WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder()`.
@@ -46,8 +50,9 @@ const TREE: [(&str, &str, bool); 14] = [
 const RADIO_A: [&str; 3] = ["&Full Encryption", "&Quick Encryption", "&No Encryption"];
 const RADIO_B: [&str; 3] = ["&No Delete", "&Quick Delete", "&DOD Delete"];
 
-const FOCUS_NAMES: [&str; 6] = [
-    "árbol", "archivos", "radios A", "radios B", "casillas", "botones",
+const FOCUS_NAMES: [&str; 11] = [
+    "árbol", "archivos", "dropdown", "nombre", "clave", "radios A", "radios B", "casillas",
+    "lista", "progreso", "botones",
 ];
 
 struct Show {
@@ -57,10 +62,15 @@ struct Show {
     tree_top: usize,
     files: TableDef,
     files_state: TableState,
+    dropdown: Dropdown,
+    input_name: InputField,
+    input_pass: InputField,
     radio_a: usize,
     radio_b: usize,
     checks: Vec<CheckItem>,
     check_focus: usize,
+    listbox: ListBox,
+    progress_pct: u8,
     btn_sel: usize,
     /// Botón con clic en curso (se pinta hundido un instante).
     flash: Option<usize>,
@@ -82,7 +92,7 @@ fn layout(bounds: Rect) -> Layout {
     let file_panel = Rect::new(27, 3, 52, 19)
         .intersect(bounds)
         .unwrap_or(Rect::new(0, 0, 0, 0));
-    let dialog = Rect::centered_in(58, 17, bounds);
+    let dialog = Rect::centered_in(64, 21, bounds);
     Layout {
         tree_panel,
         file_panel,
@@ -122,6 +132,13 @@ impl Show {
             tree_top: 0,
             files: TableDef::new(&[("Nombre", 12), ("Ext", 5), ("Tamaño", 9)], rows),
             files_state: TableState::new(),
+            dropdown: Dropdown::new("Depto", &["Ventas", "Compras", "Gerencia", "Soporte"]),
+            input_name: InputField::new(18),
+            input_pass: {
+                let mut p = InputField::new(12);
+                p.mask = Some('*');
+                p
+            },
             radio_a: 1,
             radio_b: 1,
             checks: vec![
@@ -130,6 +147,17 @@ impl Show {
                 CheckItem::new("&Expert Mode", false),
             ],
             check_focus: 0,
+            listbox: ListBox::new(&[
+                "CONFIG.SYS",
+                "AUTOEXEC.BAT",
+                "COMMAND.COM",
+                "README.TXT",
+                "DATA.DBF",
+                "INDEX.NTX",
+                "BACKUP.ZIP",
+                "LOG.TXT",
+            ]),
+            progress_pct: 42,
             btn_sel: 0,
             flash: None,
             focus: 0,
@@ -311,76 +339,173 @@ impl Show {
             status_bar(buf, &msg, "Alt-F1: Ayuda", t);
         }
 
-        // Diálogo central con radios + casillas + botones (clic animado).
+        // Diálogo central: todos los controles (dropdown se pinta al final,
+        // para que su overlay quede encima).
         if !lay.dialog.is_empty() {
             let d = lay.dialog;
-            let mut wo = WindowOpts::dialog("Secure Settings", t);
+            let mut wo = WindowOpts::dialog("Showroom 90TUI", t);
             wo.controls = true;
             window(buf, d, &wo, t);
             let base = t.dialog_attr();
             let hot = Attr::bold(Color::Red, t.dialog);
             let cstyle = CheckStyle::new(HotAttrs { base, hot }, GlyphSet::modern());
-            // Radios A (izq) y B (der).
+            let lx = d.x + 3; // columna izquierda
+            let rx = d.x + 36; // columna derecha
+            let label_attr = Attr::new(Color::Black, t.dialog);
+
+            // Dropdown + inputs (izquierda, filas 2/4/5).
+            draw_text(buf, lx, d.y + 2, "Depto:", label_attr);
+            let dd_rect = Rect::new(lx + 8, d.y + 2, 20, 1);
+            draw_text(buf, lx, d.y + 4, "Nombre:", label_attr);
+            input_draw(
+                buf,
+                Rect::new(lx + 8, d.y + 4, 20, 1),
+                &self.input_name,
+                focus == 3,
+            );
+            draw_text(buf, lx, d.y + 5, "Clave:", label_attr);
+            input_draw(
+                buf,
+                Rect::new(lx + 8, d.y + 5, 20, 1),
+                &self.input_pass,
+                focus == 4,
+            );
+            if focus == 2 {
+                draw_text(buf, lx - 1, d.y + 2, "►", Attr::bold(Color::Red, t.dialog));
+            }
+            if focus == 3 {
+                draw_text(buf, lx - 1, d.y + 4, "►", Attr::bold(Color::Red, t.dialog));
+            }
+            if focus == 4 {
+                draw_text(buf, lx - 1, d.y + 5, "►", Attr::bold(Color::Red, t.dialog));
+            }
+
+            // Radios A (izq) y lista con scrollbar (der).
             for (i, label) in RADIO_A.iter().enumerate() {
                 tui90::radio_draw(
                     buf,
-                    d.x + 3,
-                    d.y + 2 + i as u16,
+                    lx,
+                    d.y + 7 + i as u16,
                     label,
                     radio_a == i,
-                    focus == 2,
+                    focus == 5,
                     cstyle,
                 );
             }
+            if focus == 5 {
+                draw_text(
+                    buf,
+                    lx - 1,
+                    d.y + 7 + radio_a as u16,
+                    "►",
+                    Attr::bold(Color::Red, t.dialog),
+                );
+            }
+            draw_text(buf, rx, d.y + 1, "Archivos:", label_attr);
+            let lb_rect = Rect::new(rx, d.y + 2, 25, 8);
+            listbox_draw(buf, lb_rect, &self.listbox);
+            if focus == 8 {
+                let lrow = (self.listbox.selected.saturating_sub(self.listbox.top)) as u16;
+                draw_text(
+                    buf,
+                    rx - 1,
+                    d.y + 2 + lrow,
+                    "►",
+                    Attr::bold(Color::Red, t.dialog),
+                );
+            }
+
+            // Radios B (der, bajo la lista) y casillas (izq).
             for (i, label) in RADIO_B.iter().enumerate() {
                 tui90::radio_draw(
                     buf,
-                    d.x + 30,
-                    d.y + 2 + i as u16,
+                    rx,
+                    d.y + 11 + i as u16,
                     label,
                     radio_b == i,
-                    focus == 3,
+                    focus == 6,
                     cstyle,
                 );
             }
-            // Casillas.
-            for (i, c) in checks.iter().enumerate() {
-                let (cx, cy) = if i < 2 {
-                    (d.x + 3, d.y + 6 + i as u16)
-                } else {
-                    (d.x + 30, d.y + 6)
-                };
-                tui90::checkbox_draw(buf, cx, cy, c, focus == 4 && check_focus == i, cstyle);
+            if focus == 6 {
+                draw_text(
+                    buf,
+                    rx - 1,
+                    d.y + 11 + radio_b as u16,
+                    "►",
+                    Attr::bold(Color::Red, t.dialog),
+                );
             }
-            // Botones (hundido = clic en curso).
-            let bw = button_draw(buf, d.x + 12, d.y + 11, "OK", t, flash == Some(0));
+            for (i, c) in checks.iter().enumerate() {
+                tui90::checkbox_draw(
+                    buf,
+                    lx,
+                    d.y + 11 + i as u16,
+                    c,
+                    focus == 7 && check_focus == i,
+                    cstyle,
+                );
+            }
+            if focus == 7 {
+                draw_text(
+                    buf,
+                    lx - 1,
+                    d.y + 11 + check_focus as u16,
+                    "►",
+                    Attr::bold(Color::Red, t.dialog),
+                );
+            }
+
+            // Progreso (izq, fila 15) con etiqueta de % dentro.
+            draw_text(buf, lx, d.y + 14, "Copia:", label_attr);
+            let mut pbar = tui90::ProgressBar::new(self.progress_pct);
+            pbar.foreground_color = t.teal;
+            progressbar_draw(buf, Rect::new(lx + 8, d.y + 14, 22, 1), &pbar);
+            if focus == 9 {
+                draw_text(buf, lx - 1, d.y + 14, "►", Attr::bold(Color::Red, t.dialog));
+            }
+
+            // Botones (ancho mínimo 10, centrados).
+            let bw_ok = button_width("OK");
+            let bw_cancel = button_width("Cancel");
+            let total = bw_ok + 4 + bw_cancel;
+            let bx0 = d.x + (d.w.saturating_sub(total)) / 2;
+            button_draw(buf, bx0, d.y + 16, "OK", t, flash == Some(0));
             button_draw(
                 buf,
-                d.x + 12 + bw + 4,
-                d.y + 11,
+                bx0 + bw_ok + 4,
+                d.y + 16,
                 "Cancel",
                 t,
                 flash == Some(1),
             );
-            if focus == 5 {
+            if focus == 10 {
                 let mx = if btn_sel == 0 {
-                    d.x + 11
+                    bx0 - 1
                 } else {
-                    d.x + 11 + bw + 4
+                    bx0 + bw_ok + 4 - 1
                 };
-                draw_text(buf, mx, d.y + 11, "►", Attr::bold(Color::Red, t.dialog));
+                draw_text(buf, mx, d.y + 16, "►", Attr::bold(Color::Red, t.dialog));
             }
             // Etiqueta de foco actual (ancho en celdas, con saturación).
             let fl = format!("[{}]", FOCUS_NAMES[focus]);
             let fw: u16 = fl.chars().count() as u16;
             let fx = d.x.saturating_add(d.w.saturating_sub(fw).saturating_sub(2));
             draw_text(buf, fx, d.y + d.h - 1, &fl, base);
+
+            // Dropdown al final: línea + overlay encima de todo.
+            dropdown_draw(buf, dd_rect, &self.dropdown, t);
         }
     }
 
     /// Devuelve `false` para salir.
     fn key(&mut self, code: KeyCode) -> bool {
         if code == KeyCode::Esc {
+            // Si el dropdown está abierto, Esc primero lo cancela.
+            if self.dropdown.is_open {
+                dropdown_key(&mut self.dropdown, code);
+                return true;
+            }
             return false;
         }
         // F10 también sale (como en la referencia).
@@ -389,8 +514,21 @@ impl Show {
         }
         let lay = layout(self.screen.bounds());
         if code == KeyCode::Tab {
-            self.focus = (self.focus + 1) % 6;
+            self.focus = (self.focus + 1) % FOCUS_NAMES.len();
             self.message = format!("Foco: panel {}.", FOCUS_NAMES[self.focus]);
+            return true;
+        }
+        // Dropdown abierto: captura todo (menos Tab/Esc ya tratados).
+        if self.dropdown.is_open {
+            match dropdown_key(&mut self.dropdown, code) {
+                DropdownKey::Accepted(i) => {
+                    self.message = format!("Depto: {}.", self.dropdown.options[i]);
+                }
+                DropdownKey::Cancelled => {
+                    self.message = "Dropdown cancelado.".to_string();
+                }
+                _ => {}
+            }
             return true;
         }
         match self.focus {
@@ -413,17 +551,37 @@ impl Show {
                     }
                 }
             }
-            2 => {
+            2 => match dropdown_key(&mut self.dropdown, code) {
+                DropdownKey::Accepted(i) => {
+                    self.message = format!("Depto: {}.", self.dropdown.options[i]);
+                }
+                DropdownKey::Opened => {
+                    self.message = "Dropdown abierto (↑↓ Enter Esc).".to_string();
+                }
+                _ => {}
+            },
+            3 => {
+                if input_key(&mut self.input_name, code) == InputKey::Changed {
+                    self.message = format!("Nombre: {}.", self.input_name.value);
+                }
+            }
+            4 => {
+                if input_key(&mut self.input_pass, code) == InputKey::Changed {
+                    self.message =
+                        format!("Clave: {} chars.", self.input_pass.value.chars().count());
+                }
+            }
+            5 => {
                 if let RadioNav::Select(i) = radio_key(RADIO_A.len(), self.radio_a, code) {
                     self.radio_a = i;
                 }
             }
-            3 => {
+            6 => {
                 if let RadioNav::Select(i) = radio_key(RADIO_B.len(), self.radio_b, code) {
                     self.radio_b = i;
                 }
             }
-            4 => match check_key(&self.checks, self.check_focus, code) {
+            7 => match check_key(&self.checks, self.check_focus, code) {
                 CheckNav::Move(i) => self.check_focus = i,
                 CheckNav::Toggled(i) => {
                     if let Some(c) = self.checks.get_mut(i) {
@@ -436,6 +594,26 @@ impl Show {
                     }
                 }
                 CheckNav::Stay => {}
+            },
+            8 => {
+                let vis = 8usize; // alto del listbox en el diálogo
+                match listbox_key(&mut self.listbox, vis, code) {
+                    tui90::ListNav::Move(i) => {
+                        self.message = format!("Archivo: {}.", self.listbox.items[i]);
+                    }
+                    tui90::ListNav::Stay => {}
+                }
+            }
+            9 => match code {
+                KeyCode::Left | KeyCode::Down => {
+                    self.progress_pct = self.progress_pct.saturating_sub(5);
+                }
+                KeyCode::Right | KeyCode::Up => {
+                    self.progress_pct = self.progress_pct.saturating_add(5).min(100);
+                }
+                KeyCode::Home => self.progress_pct = 0,
+                KeyCode::End => self.progress_pct = 100,
+                _ => {}
             },
             _ => match code {
                 KeyCode::Left | KeyCode::Right => {

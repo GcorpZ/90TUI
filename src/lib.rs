@@ -22,22 +22,25 @@ pub use app::{
 };
 pub use core::{
     enter_screen, leave_screen, Attr, Backend, Buffer, Cell, Color, CrosstermBackend, DrawOp, Rect,
-    Screen, ScreenStack, Snapshot, TestBackend, Theme,
+    Screen, ScreenStack, Snapshot, TestBackend, Theme, WidgetStyle,
 };
 pub use prim::{
-    button, button_draw, button_width, draw_hot_label, draw_text, drive, fit_text, folder,
-    hot_key_of, hsep, parse_hotkey, shadow, shadow_offset, shadow_solid, shadow_stipple,
-    shadow_styled, status_bar, top_bar, visible_len, vscrollbar, win_close, win_min, window,
-    FolderGlyphs, HotAttrs, ShadowStyle, WindowOpts,
+    button, button_draw, button_draw_ex, button_draw_opts, button_ex, button_width, draw_hot_label,
+    draw_text, drive, fit_text, folder, hot_key_of, hsep, parse_hotkey, shadow, shadow_offset,
+    shadow_solid, shadow_stipple, shadow_styled, status_bar, top_bar, visible_len, vscrollbar,
+    win_close, win_min, window, ButtonOpts, FolderGlyphs, HotAttrs, ShadowStyle, WindowOpts,
+    BUTTON_MIN_WIDTH,
 };
 pub use widgets::{
-    bar_fill_width, check_key, check_width, checkbox_draw, confirm_draw, confirm_key,
-    confirm_layout, fkey_bar, fkey_bar_compact, fkey_bar_stacked, fkey_bar_styled, form_draw,
-    form_key, list_draw, list_key, menubar_draw, menubar_key, popup_draw, popup_key, popup_layout,
-    popup_size, progress_draw, radio_draw, radio_key, table_draw, table_key, BarInfo, CheckItem,
-    CheckNav, CheckStyle, DialogKey, FKeyStyle, Field, FieldKind, FormKey, FormState, GlyphSet,
-    MenuBarKey, MenuDef, MenuItem, PopupItem, PopupKey, ProgressInfo, RadioNav, TableDef,
-    TableState,
+    bar_fill_width, check_key, check_width, check_width_styled, checkbox_draw, confirm_draw,
+    confirm_key, confirm_layout, dropdown_draw, dropdown_key, dropdown_overlay_rect, dropdown_size,
+    fkey_bar, fkey_bar_compact, fkey_bar_stacked, fkey_bar_styled, form_draw, form_key, input_draw,
+    input_key, list_draw, list_key, listbox_draw, listbox_key, listbox_visible, menubar_draw,
+    menubar_key, popup_draw, popup_key, popup_layout, popup_size, progress_draw, progress_fill,
+    progressbar_draw, radio_draw, radio_key, table_draw, table_key, BarInfo, CheckItem, CheckNav,
+    CheckStyle, DialogKey, Dropdown, DropdownKey, FKeyStyle, Field, FieldKind, FormKey, FormState,
+    GlyphSet, InputField, InputKey, ListBox, ListNav, MenuBarKey, MenuDef, MenuItem, PopupItem,
+    PopupKey, ProgressBar, ProgressInfo, RadioNav, TableDef, TableState,
 };
 
 /// Versión del crate.

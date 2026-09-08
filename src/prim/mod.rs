@@ -12,7 +12,10 @@ pub mod shadow;
 pub mod title;
 pub mod window;
 
-pub use button::{button, button_draw, button_width};
+pub use button::{
+    button, button_draw, button_draw_ex, button_draw_opts, button_ex, button_width, ButtonOpts,
+    BUTTON_MIN_WIDTH,
+};
 pub use icons::{drive, folder, win_close, win_min, FolderGlyphs};
 pub use label::{
     base_on, draw_hot_label, draw_text, fit_text, hot_key_of, parse_hotkey, visible_len, HotAttrs,

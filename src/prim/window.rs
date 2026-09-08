@@ -8,22 +8,39 @@ use crate::core::{Buffer, Cell, Color, Rect, Theme};
 use super::label::{draw_text, fit_text, visible_len};
 use super::shadow::{shadow_styled, ShadowStyle};
 
-/// Opciones de dibujo de una ventana.
+/// Opciones de dibujo de una ventana (incluye los 4 parámetros globales:
+/// cuerpo = fg/bg, `border_color` opt-in, `shadow` = `has_shadow`).
 #[derive(Clone, Debug)]
 pub struct WindowOpts {
-    pub body_bg: Color,
+    /// `foreground_color` global: texto del cuerpo.
     pub body_fg: Color,
+    /// `background_color` global: fondo del cuerpo.
+    pub body_bg: Color,
     pub title: String,
     pub title_bg: Color,
     pub title_fg: Color,
     pub title_bold: bool,
+    /// `has_shadow`: si `false`, no proyecta sombra.
     pub shadow: bool,
     pub shadow_style: ShadowStyle,
-    /// Pinta caja de cierre `[■]` a la izquierda del título.
+    /// `border_color` global: `Some` pinta marco de 1 celda en el borde
+    /// del rect; `None` = bloque sin marco (look Clipper por defecto).
+    pub border_color: Option<Color>,
+    /// Pinta caja de cierre `[■]` (`\u{25a0}`) en `(x+1, y)` del título.
     pub controls: bool,
 }
 
 impl WindowOpts {
+    /// Alias explícito del flag de sombra (`shadow`).
+    pub fn has_shadow(&self) -> bool {
+        self.shadow
+    }
+
+    /// Ajusta `has_shadow` en cadena.
+    pub fn with_shadow(mut self, has_shadow: bool) -> Self {
+        self.shadow = has_shadow;
+        self
+    }
     /// Modal gris con título teal (diálogos de trabajo).
     pub fn modal(title: &str, theme: Theme) -> Self {
         Self {
@@ -35,6 +52,7 @@ impl WindowOpts {
             title_bold: true,
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
+            border_color: None,
             controls: false,
         }
     }
@@ -50,6 +68,7 @@ impl WindowOpts {
             title_bold: true,
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
+            border_color: None,
             controls: false,
         }
     }
@@ -65,6 +84,7 @@ impl WindowOpts {
             title_bold: true,
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
+            border_color: None,
             controls: false,
         }
     }
@@ -94,9 +114,21 @@ pub fn window(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, theme: Theme) {
             dim: false,
         };
         draw_text(buf, tx, rect.y, &fit, attr);
-        // Caja de cierre sobre la barra (después del título para que se vea).
+        // Caja de cierre `[■]` (`\u{25a0}`) sobre la barra, en `(x+1, y)`.
         if opts.controls && rect.w >= 8 {
             super::icons::win_close(buf, rect.x.saturating_add(1), rect.y, attr, Color::Yellow);
+        }
+    }
+    // Borde opt-in: marco de 1 celda en el perímetro (no cambia el tamaño).
+    if let Some(border) = opts.border_color {
+        let bc = Cell::new(' ', border, border);
+        for x in rect.x..rect.right() {
+            buf.set(x, rect.y, bc);
+            buf.set(x, rect.bottom().saturating_sub(1), bc);
+        }
+        for y in rect.y..rect.bottom() {
+            buf.set(rect.x, y, bc);
+            buf.set(rect.right().saturating_sub(1), y, bc);
         }
     }
 }
@@ -133,5 +165,29 @@ mod tests {
         );
         // La última celda de la barra sigue siendo teal (nada se sale).
         assert_eq!(b.get(2 + 12 - 1, 1).unwrap().bg, t.teal);
+    }
+
+    #[test]
+    fn close_box_and_border() {
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(40, 15, t.desktop);
+        let r = Rect::new(5, 3, 30, 9);
+        let mut opts = WindowOpts::modal("ORDENAR", t);
+        opts.controls = true;
+        window(&mut b, r, &opts, t);
+        // `[■]` en (x+1, y): corchetes + `\u{25a0}` amarillo.
+        assert_eq!(b.get(6, 3).unwrap().ch, '[');
+        assert_eq!(b.get(7, 3).unwrap().ch, '\u{25a0}');
+        assert_eq!(b.get(7, 3).unwrap().fg, Color::Yellow);
+        assert_eq!(b.get(8, 3).unwrap().ch, ']');
+        // Borde opt-in: perímetro en el color pedido.
+        let mut bordered = WindowOpts::modal("B", t);
+        bordered.border_color = Some(Color::Red);
+        window(&mut b, r, &bordered, t);
+        assert_eq!(b.get(5, 3).unwrap().bg, Color::Red);
+        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().bg, Color::Red);
+        // Sin borde por defecto: la esquina es del cuerpo.
+        window(&mut b, r, &WindowOpts::modal("B", t), t);
+        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().bg, Color::Grey);
     }
 }

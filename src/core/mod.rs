@@ -9,6 +9,7 @@ pub mod cell;
 pub mod color;
 pub mod rect;
 pub mod screen;
+pub mod style;
 pub mod theme;
 
 pub use backend::{enter_screen, leave_screen, Backend, CrosstermBackend, TestBackend};
@@ -17,4 +18,5 @@ pub use cell::Cell;
 pub use color::{Attr, Color};
 pub use rect::Rect;
 pub use screen::{Screen, ScreenStack};
+pub use style::WidgetStyle;
 pub use theme::Theme;
