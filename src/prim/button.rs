@@ -161,7 +161,6 @@ pub fn button_draw_opts(
     };
 
     let attr = resolve_attr(theme, opts);
-    let window_bg = theme.window_bg; // Fondo base de ventana para la ilusión óptica
 
     // ----------------------------------------------------------------
     // FILA 1: CUERPO DEL BOTÓN + SOMBRA LATERAL MITAD INFERIOR
@@ -196,42 +195,46 @@ pub fn button_draw_opts(
         );
     }
 
-    // SI NO ESTÁ PRESIONADO, DIBUJAMOS LA ILUSIÓN ÓPTICA DE LA SOMBRA DE MEDIA CELDA
+    // SI NO ESTÁ PRESIONADO, DIBUJAMOS LA ILUSIÓN ÓPTICA DE LA SOMBRA DETECTANDO EL FONDO REAL
     if !pressed && opts.has_shadow {
         let x_end = bx.saturating_add(w);
 
-        // A. SOMBRA LATERAL DER (Fila 1): `▄` (`\u{2584}`), tinta negra abajo,
-        // fondo de ventana arriba.
+        // A. SOMBRA LATERAL DER (Fila 1)
         if buf.in_bounds(x_end, by) {
+            // DETECCIÓN: Leemos la celda que ya existe en el búfer en esa coordenada
+            let current_cell = buf.get(x_end, by).unwrap_or(Cell::blank(theme.window_bg));
+            let real_bg = current_cell.bg; // El verdadero color del fondo donde está el botón
+
             buf.set(
                 x_end,
                 by,
                 Cell {
                     ch: '\u{2584}',
-                    fg: Color::Black,
-                    bg: window_bg,
+                    fg: Color::Black, // Negro puro para la mitad inferior
+                    bg: real_bg,      // El color real detectado para la mitad superior
                     bold: false,
                     dim: false,
                 },
             );
         }
 
-        // ----------------------------------------------------------------
-        // FILA 2: SOMBRA INFERIOR DE MEDIA ALTURA (Pegada a la base)
-        // ----------------------------------------------------------------
-        // Desde bx + 1 hasta x_end inclusive: base + esquina.
-        // `▀` (`\u{2580}`): tinta negra arriba (pegada al botón),
-        // fondo de ventana abajo.
+        // B. SOMBRA INFERIOR DE MEDIA ALTURA (Fila 2)
         let shadow_y = by.saturating_add(1);
         for sx in bx.saturating_add(1)..=x_end {
             if buf.in_bounds(sx, shadow_y) {
+                // DETECCIÓN: Leemos la celda de la fila de abajo antes de pisarla
+                let current_cell = buf
+                    .get(sx, shadow_y)
+                    .unwrap_or(Cell::blank(theme.window_bg));
+                let real_bg = current_cell.bg; // El color real debajo del botón
+
                 buf.set(
                     sx,
                     shadow_y,
                     Cell {
                         ch: '\u{2580}',
-                        fg: Color::Black,
-                        bg: window_bg,
+                        fg: Color::Black, // Negro puro para la mitad superior
+                        bg: real_bg,      // El color real detectado para la mitad inferior
                         bold: false,
                         dim: false,
                     },
@@ -279,20 +282,35 @@ mod tests {
         assert_eq!(w, BUTTON_MIN_WIDTH);
         let (x_start, x_end) = (x, x.saturating_add(w));
         assert_eq!(b.get(2, 1).unwrap().bg, t.button_bg);
-        // A. Lateral `(x_end, y)`: `▄` negro sobre fondo de ventana.
+        // A. Lateral `(x_end, y)`: `▄` negro sobre el fondo REAL detectado.
         let side = b.get(x_end, y).unwrap();
         assert_eq!(side.ch, '\u{2584}');
         assert_eq!(side.fg, Color::Black);
-        assert_eq!(side.bg, t.window_bg);
-        // B. Inferior `(x_start+1)..=(x_end)` en `y+1`: `▀` negro arriba.
+        assert_eq!(side.bg, t.desktop); // funde con el fondo existente
+                                        // B. Inferior `(x_start+1)..=(x_end)` en `y+1`: `▀` sobre fondo real.
         for sx in x_start.saturating_add(1)..=x_end {
             let c = b.get(sx, y.saturating_add(1)).unwrap();
             assert_eq!(c.ch, '\u{2580}', "medio bloque sup en ({sx}, 2)");
             assert_eq!(c.fg, Color::Black);
-            assert_eq!(c.bg, t.window_bg);
+            assert_eq!(c.bg, t.desktop); // detectado, no gris fijo
         }
         // Fuera del rango: fondo intacto (nada extra a la izquierda).
         assert_eq!(b.get(x_start, y.saturating_add(1)).unwrap().bg, t.desktop);
+    }
+
+    #[test]
+    fn shadow_detects_real_background() {
+        use crate::core::Color;
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(30, 6, t.desktop);
+        // Fondo blanco bajo la futura sombra: debe detectarlo, no gris fijo.
+        b.text(3, 2, "FFFFFFFFFF", Color::Black, Color::White);
+        button(&mut b, 2, 1, "OK", t);
+        for x in 3..=12u16 {
+            let c = b.get(x, 2).unwrap();
+            assert_eq!(c.ch, '\u{2580}');
+            assert_eq!(c.bg, Color::White, "fondo detectado en ({x}, 2)");
+        }
     }
 
     #[test]
@@ -353,12 +371,12 @@ mod tests {
         assert_eq!(b.get(4, 2).unwrap().ch, '[');
         assert_eq!(b.get(4 + w - 1, 2).unwrap().ch, ']');
         assert_eq!(b.get(4, 1).unwrap().bg, t.desktop); // nada arriba
-                                                        // Sombra `▀` abajo (by+1): tinta negra, fondo de ventana.
+                                                        // Sombra `▀` abajo (by+1): tinta negra, fondo real detectado.
         for x in 5..=4 + w {
             let c = b.get(x, 3).unwrap();
             assert_eq!(c.ch, '\u{2580}', "medio bloque sup en ({x}, 3)");
             assert_eq!(c.fg, Color::Black);
-            assert_eq!(c.bg, t.window_bg);
+            assert_eq!(c.bg, t.desktop);
         }
         // Lateral `▄` en la misma fila.
         assert_eq!(b.get(4 + w, 2).unwrap().ch, '\u{2584}');
