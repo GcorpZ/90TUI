@@ -10,7 +10,7 @@
 use std::io::{self, stdout};
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use tui90::{enter_screen, leave_screen, Backend, Cell, CrosstermBackend, Rect, Screen, Theme};
 
@@ -67,10 +67,16 @@ fn run() -> io::Result<()> {
     loop {
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
-                Event::Key(k) => match k.code {
-                    KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => break,
-                    _ => {}
-                },
+                Event::Key(k) => {
+                    // Filtra Release: sin esto cada toque cuenta doble.
+                    if k.kind == KeyEventKind::Release {
+                        continue;
+                    }
+                    match k.code {
+                        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                        _ => {}
+                    }
+                }
                 Event::Resize(w, h) => {
                     screen.resize(w, h);
                     paint(&mut screen);

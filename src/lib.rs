@@ -16,9 +16,9 @@ pub mod widgets;
 
 // Re-exports para `use tui90::Buffer;` directo.
 pub use app::{
-    centered as app_centered, desktop as app_desktop, draw_fkeys, map_key, match_fkey,
-    menu_title_x, poll_event, popup as app_popup, test_app, to_crossterm, App, AppEvent, AppKey,
-    DesktopLayout, FKeyDef, Focus, Layer, ShellContent,
+    centered as app_centered, desktop as app_desktop, draw_fkeys, map_key, map_key_event,
+    match_fkey, menu_title_x, poll_event, popup as app_popup, test_app, to_crossterm, App,
+    AppEvent, AppKey, DesktopLayout, FKeyDef, Focus, Layer, ShellContent,
 };
 pub use core::{
     enter_screen, leave_screen, Attr, Backend, Buffer, Cell, Color, CrosstermBackend, DrawOp, Rect,
@@ -26,14 +26,16 @@ pub use core::{
 };
 pub use prim::{
     button, button_width, draw_hot_label, draw_text, fit_text, hot_key_of, hsep, parse_hotkey,
-    shadow, shadow_offset, status_bar, top_bar, visible_len, window, WindowOpts,
+    shadow, shadow_offset, shadow_solid, shadow_stipple, shadow_styled, status_bar, top_bar,
+    visible_len, vscrollbar, window, HotAttrs, ShadowStyle, WindowOpts,
 };
 pub use widgets::{
-    bar_fill_width, confirm_draw, confirm_key, confirm_layout, fkey_bar, form_draw, form_key,
-    list_draw, list_key, menubar_draw, menubar_key, popup_draw, popup_key, popup_layout,
-    popup_size, progress_draw, table_draw, table_key, BarInfo, DialogKey, Field, FieldKind,
-    FormKey, FormState, MenuBarKey, MenuDef, MenuItem, PopupItem, PopupKey, ProgressInfo, TableDef,
-    TableState,
+    bar_fill_width, check_key, check_width, checkbox_draw, confirm_draw, confirm_key,
+    confirm_layout, fkey_bar, form_draw, form_key, list_draw, list_key, menubar_draw, menubar_key,
+    popup_draw, popup_key, popup_layout, popup_size, progress_draw, radio_draw, radio_key,
+    table_draw, table_key, BarInfo, CheckItem, CheckNav, DialogKey, Field, FieldKind, FormKey,
+    FormState, MenuBarKey, MenuDef, MenuItem, PopupItem, PopupKey, ProgressInfo, RadioNav,
+    TableDef, TableState,
 };
 
 /// Versión del crate.

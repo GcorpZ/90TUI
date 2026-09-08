@@ -9,7 +9,7 @@
 use std::io::{self, stdout};
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use tui90::{
     draw_text, enter_screen, leave_screen, list_draw, progress_draw, status_bar, top_bar, window,
@@ -88,6 +88,8 @@ fn run() -> io::Result<()> {
     loop {
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
+                // Filtra Release antes que nada (si no, Esc-release también saldría).
+                Event::Key(k) if k.kind == KeyEventKind::Release => {}
                 Event::Key(k)
                     if matches!(k.code, KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q')) =>
                 {

@@ -110,15 +110,30 @@ pub fn to_crossterm(key: AppKey) -> crossterm::event::KeyCode {
     }
 }
 
+/// Versión con kind: ignora `Release` y procesa `Press`/`Repeat`.
+/// Sin este filtro, en Windows cada toque genera Press + Release y todo
+/// se mueve de 2 en 2 (menús que saltan una opción). La repetición por
+/// tecla mantenida (`Repeat`) sí se atiende para scroll fluido.
+pub fn map_key_event(
+    code: crossterm::event::KeyCode,
+    modifiers: crossterm::event::KeyModifiers,
+    kind: crossterm::event::KeyEventKind,
+) -> Option<AppEvent> {
+    if kind == crossterm::event::KeyEventKind::Release {
+        return None;
+    }
+    Some(map_key(code, modifiers))
+}
+
 /// Lee un evento con timeout. `Ok(None)` = sin novedad (el loop puede
-/// animar/reloj). Ignora mouse y foco (solo teclado + resize).
+/// animar/reloj). Ignora mouse, foco y `Release` (solo teclado + resize).
 pub fn poll_event(timeout: Duration) -> io::Result<Option<AppEvent>> {
     use crossterm::event::Event;
     if !crossterm::event::poll(timeout)? {
         return Ok(None);
     }
     match crossterm::event::read()? {
-        Event::Key(k) => Ok(Some(map_key(k.code, k.modifiers))),
+        Event::Key(k) => Ok(map_key_event(k.code, k.modifiers, k.kind)),
         Event::Resize(w, h) => Ok(Some(AppEvent::Resize(w, h))),
         _ => Ok(None),
     }
@@ -146,6 +161,17 @@ mod tests {
         assert_eq!(map_key(C::F(2), M::empty()), AppEvent::key(AppKey::F(2)));
         assert!(map_key(C::Esc, M::empty()).is_esc());
         assert_eq!(map_key(C::BackTab, M::SHIFT), AppEvent::key(AppKey::Tab));
+    }
+
+    #[test]
+    fn release_is_ignored_repeat_passes() {
+        use crossterm::event::KeyEventKind as K;
+        let press = map_key_event(C::Down, M::empty(), K::Press);
+        assert_eq!(press, Some(AppEvent::key(AppKey::Down)));
+        let repeat = map_key_event(C::Down, M::empty(), K::Repeat);
+        assert_eq!(repeat, Some(AppEvent::key(AppKey::Down)));
+        assert_eq!(map_key_event(C::Down, M::empty(), K::Release), None);
+        assert_eq!(map_key_event(C::Esc, M::empty(), K::Release), None);
     }
 
     #[test]

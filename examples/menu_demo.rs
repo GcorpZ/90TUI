@@ -13,7 +13,7 @@
 use std::io::{self, stdout};
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use tui90::{
     draw_text, enter_screen, fkey_bar, leave_screen, menubar_draw, menubar_key, popup_draw,
@@ -194,6 +194,10 @@ fn run() -> io::Result<()> {
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
                 Event::Key(k) => {
+                    // Filtra Release: sin esto el menú salta de 2 en 2.
+                    if k.kind == KeyEventKind::Release {
+                        continue;
+                    }
                     if !demo.key(k.code) {
                         break;
                     }

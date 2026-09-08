@@ -42,7 +42,7 @@ Sin esto no hay nada: todo dibujo escribe en `Buffer`, nunca directo a terminal 
 | Archivo | Dibuja | Función ejemplo |
 |---|---|---|
 | `prim/window.rs` | Bloque plano + título + sombra dura | `window(buf, rect, title, theme)` |
-| `prim/shadow.rs` | Rect negro offset | `shadow(buf, rect, dx=2, dy=1)` |
+| `prim/shadow.rs` | Sombra fantasma/tramada/sólida | `shadow()`, `shadow_stipple()`, `shadow_solid()` |
 | `prim/button.rs` | Botón teal ` Esc Salir ` | `button(buf, x,y,label,focused)` |
 | `prim/label.rs` | Texto con hotkey amarilla | `hot_label(buf, x,y,"&Respaldo")` |
 | `prim/separator.rs` | Línea blanca separadora de grupos | `hsep(buf, y, x0,x1)` |

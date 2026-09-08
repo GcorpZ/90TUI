@@ -11,7 +11,7 @@ pub mod focus;
 pub mod layout;
 
 pub use app::{menu_title_x, test_app, App, ShellContent};
-pub use events::{map_key, poll_event, to_crossterm, AppEvent, AppKey};
+pub use events::{map_key, map_key_event, poll_event, to_crossterm, AppEvent, AppKey};
 pub use fkeys::{draw_fkeys, match_fkey, FKeyDef};
 pub use focus::{Focus, Layer};
 pub use layout::{centered, desktop, popup, DesktopLayout};

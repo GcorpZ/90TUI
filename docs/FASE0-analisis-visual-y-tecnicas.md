@@ -69,7 +69,7 @@ Tu intuición es correcta: mismo hardware (VGA texto 80x25, VRAM `0xB800:0000`),
 | Selección | Negro sobre verde / blanco sobre azul | Gris claro + texto negro (menús), azul+blanco (listas) |
 | Hotkey | Rojo/blanco | Amarillo sobre azul/negro, sistemático |
 | Botón | `[ Go To ]` gris con sombra `▓` | Bloque teal ` Esc Salir ` + sombra negra sólida |
-| Sombra | Caracteres `▒▓` / atributo gris | Rect negro sólido dx=2 dy=1 |
+| Sombra | Caracteres `▒▓` / atributo gris | Fantasma gris (glifo intacto) o tramado 50%, dx=2 dy=1 |
 | Fuente | CP437 stock 8x16 | VGA RAM redefinida: flechas, `Esc`, botones redondeados, logo |
 | Sensación | Técnica, alto contraste, cansa | Pastel, aireada, bajo contraste, "refrescante" |
 | Stack pantallas | `TView` / `TDialog` objetos | `Savescreen()/Restscreen()` procedural + enlazador modo protegido / XMS |
@@ -87,14 +87,14 @@ Emulación 90TUI (terminal moderna, sin acceso a VRAM):
 1. `BackBuffer = Vec<Cell{ch, fg, bg, bold}>` 80x25 escalable a cualquier tamaño (responsive).
 2. `Savescreen = push(buffer.clone_rect)` / `Restscreen = pop()` — pila, igual que Clipper.
 3. Render por diff: solo celdas cambiadas → `crossterm::queue!` + ANSI. Tan instantáneo como el `memcpy` a `0xB800`.
-4. Sombras: `fill_rect(x+2,y+1,black)` sin caracteres de sombreado, igual que la escuela Clipper.
+4. Sombras: conserva el glifo y lo aplasta a gris oscuro (translúcida) o tramado ajedrez (stipple); botones en sólido de 1px.
 5. Fuentes/iconos: no podemos tocar VGA, usamos Unicode aprox (`◄ ▲ ▼ ● Esc`) + tema de color que simula la fuente gruesa. Opcional: `font` feature con dibujo de logo en celdas.
 6. Paleta pastel de referencia como `Theme::clipper()`: cian escritorio, blanco trabajo, navy barras, teal menús/botones, azul popup, amarillo hotkeys, gris selección, negro sombra, menta diálogos, negro formularios.
 
 ## 6. Reglas de oro extraídas para la librería
 
 1. **Prohibido alto contraste por defecto.** El tema pastel estilo Clipper es el default, no un skin.
-2. **Ventana = relleno + sombra dura.** Nada de `╔═╗` salvo `Theme::turbo` opt-in para nostalgia.
+2. **Ventana = relleno + sombra fantasma.** Nada de `╔═╗` salvo `Theme::turbo` opt-in para nostalgia; botones con sombra sólida de 1px.
 3. **Un control = una llamada.** `menu_bar(&[..])`, `popup_menu()`, `form()`, `browse_table()`, `dual_progress()` dibujan responsive solos.
 4. **Todo apilable.** Cualquier diálogo guarda/restaura. Anidamiento infinito (probado: 3 niveles en captura).
 5. **Hotkeys amarillas automáticas.** Derivar de `&Letra` o primera mayúscula, pintar amarillo, `Alt+letra` dispara.

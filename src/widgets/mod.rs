@@ -5,6 +5,7 @@
 //! apilar. La navegación es pura (`*_key`) para probarse sin TTY;
 //! el loop de eventos llega en Fase 6 (`app`).
 
+pub mod checkradio;
 pub mod dialog;
 pub mod form;
 pub mod list;
@@ -14,6 +15,9 @@ pub mod progress;
 pub mod statusbar;
 pub mod table;
 
+pub use checkradio::{
+    check_key, check_width, checkbox_draw, radio_draw, radio_key, CheckItem, CheckNav, RadioNav,
+};
 pub use dialog::{confirm_draw, confirm_key, confirm_layout, DialogKey};
 pub use form::{form_draw, form_key, Field, FieldKind, FormKey, FormState};
 pub use list::{list_draw, list_key};

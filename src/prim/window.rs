@@ -6,7 +6,7 @@
 use crate::core::{Buffer, Cell, Color, Rect, Theme};
 
 use super::label::{draw_text, fit_text, visible_len};
-use super::shadow::shadow;
+use super::shadow::{shadow_styled, ShadowStyle};
 
 /// Opciones de dibujo de una ventana.
 #[derive(Clone, Debug)]
@@ -18,6 +18,7 @@ pub struct WindowOpts {
     pub title_fg: Color,
     pub title_bold: bool,
     pub shadow: bool,
+    pub shadow_style: ShadowStyle,
 }
 
 impl WindowOpts {
@@ -31,6 +32,7 @@ impl WindowOpts {
             title_fg: Color::White,
             title_bold: true,
             shadow: true,
+            shadow_style: ShadowStyle::Translucent,
         }
     }
 
@@ -44,6 +46,7 @@ impl WindowOpts {
             title_fg: Color::White,
             title_bold: true,
             shadow: true,
+            shadow_style: ShadowStyle::Translucent,
         }
     }
 
@@ -57,6 +60,7 @@ impl WindowOpts {
             title_fg: Color::White,
             title_bold: true,
             shadow: true,
+            shadow_style: ShadowStyle::Translucent,
         }
     }
 }
@@ -68,7 +72,7 @@ pub fn window(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, theme: Theme) {
         return;
     }
     if opts.shadow {
-        shadow(buf, rect, theme);
+        shadow_styled(buf, rect, 2, 1, opts.shadow_style, theme);
     }
     buf.fill_rect(rect, Cell::new(' ', opts.body_fg, opts.body_bg));
     // Barra de título: primera fila.

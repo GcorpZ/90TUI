@@ -5,6 +5,7 @@
 
 pub mod button;
 pub mod label;
+pub mod scrollbar;
 pub mod separator;
 pub mod shadow;
 pub mod title;
@@ -12,9 +13,10 @@ pub mod window;
 
 pub use button::{button, button_width};
 pub use label::{
-    base_on, draw_hot_label, draw_text, fit_text, hot_key_of, parse_hotkey, visible_len,
+    base_on, draw_hot_label, draw_text, fit_text, hot_key_of, parse_hotkey, visible_len, HotAttrs,
 };
+pub use scrollbar::vscrollbar;
 pub use separator::hsep;
-pub use shadow::{shadow, shadow_offset};
+pub use shadow::{shadow, shadow_offset, shadow_solid, shadow_stipple, shadow_styled, ShadowStyle};
 pub use title::{status_bar, top_bar};
 pub use window::{window, WindowOpts};
