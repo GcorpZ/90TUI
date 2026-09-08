@@ -152,6 +152,13 @@ pub fn draw_hot_label(buf: &mut Buffer, x: u16, y: u16, s: &str, base: Attr, hot
     cx.saturating_sub(x)
 }
 
+/// Par base+hotkey para etiquetas (evita funciones de 8 parámetros).
+#[derive(Clone, Copy, Debug)]
+pub struct HotAttrs {
+    pub base: Attr,
+    pub hot: Attr,
+}
+
 /// Atributo base sobre un fondo dado (texto blanco normal).
 pub fn base_on(bg: Color) -> Attr {
     Attr::new(Color::White, bg)
