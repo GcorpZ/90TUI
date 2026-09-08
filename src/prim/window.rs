@@ -19,6 +19,8 @@ pub struct WindowOpts {
     pub title_bold: bool,
     pub shadow: bool,
     pub shadow_style: ShadowStyle,
+    /// Pinta caja de cierre `[■]` a la izquierda del título.
+    pub controls: bool,
 }
 
 impl WindowOpts {
@@ -33,6 +35,7 @@ impl WindowOpts {
             title_bold: true,
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
+            controls: false,
         }
     }
 
@@ -47,6 +50,7 @@ impl WindowOpts {
             title_bold: true,
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
+            controls: false,
         }
     }
 
@@ -61,6 +65,7 @@ impl WindowOpts {
             title_bold: true,
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
+            controls: false,
         }
     }
 }
@@ -88,6 +93,10 @@ pub fn window(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, theme: Theme) {
             bold: opts.title_bold,
         };
         draw_text(buf, tx, rect.y, &fit, attr);
+        // Caja de cierre sobre la barra (después del título para que se vea).
+        if opts.controls && rect.w >= 8 {
+            super::icons::win_close(buf, rect.x.saturating_add(1), rect.y, attr, Color::Yellow);
+        }
     }
 }
 

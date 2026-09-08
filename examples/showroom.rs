@@ -1,8 +1,9 @@
 //! Ejemplo `showroom`: todas las capacidades a la vista (estilo PCTools).
 //!
-//! Escritorio con menubar, botonera de unidades, panel de árbol, panel de
-//! archivos con tabla + scrollbars, diálogo central con radios + casillas
-//! + OK/Cancel, línea de stats y barra F. Todo navegable con teclado.
+//! Escritorio con menubar, iconos de unidad, panel de árbol con iconos de
+//! carpeta, panel de archivos con tabla + scrollbars, diálogo central con
+//! radios `(●)` + casillas `[☑]` + botones OK/Cancel con clic animado,
+//! F-bar apilada (F sobre el número) y status con mensajes.
 //!
 //! Foco con Tab: árbol → archivos → radios → casillas → botones.
 //! Flechas mueven, Espacio alterna/elige, Enter acepta, Esc sale.
@@ -17,27 +18,29 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use tui90::{
-    button, check_key, draw_text, enter_screen, fkey_bar, leave_screen, list_key, menubar_draw,
-    radio_key, status_bar, table_draw, table_key, top_bar, vscrollbar, window, Attr, Backend,
-    Buffer, Cell, CheckItem, CheckNav, Color, CrosstermBackend, FKeyDef, MenuDef, RadioNav, Rect,
-    Screen, TableDef, TableState, Theme, WindowOpts,
+    button_draw, check_key, draw_text, drive, enter_screen, fkey_bar_stacked, folder, leave_screen,
+    list_key, menubar_draw, radio_key, status_bar, table_draw, table_key, top_bar, vscrollbar,
+    window, Attr, Backend, Buffer, Cell, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend,
+    FKeyDef, FKeyStyle, GlyphSet, HotAttrs, MenuDef, RadioNav, Rect, Screen, TableDef, TableState,
+    Theme, WindowOpts,
 };
 
-const TREE: [&str; 14] = [
-    "C:",
-    "├─ cfg",
-    "├─ dos",
-    "├─ drv",
-    "│  └─ video",
-    "├─ data",
-    "├─ system",
-    "├─ tools",
-    "├─ inbox",
-    "├─ backup",
-    "├─ temp",
-    "├─ docs",
-    "└─ log",
-    "   readme",
+/// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder()`.
+const TREE: [(&str, &str, bool); 14] = [
+    ("", "C:", true),
+    ("├─ ", "cfg", false),
+    ("├─ ", "dos", false),
+    ("├─ ", "drv", true),
+    ("│  └─ ", "video", false),
+    ("├─ ", "data", false),
+    ("├─ ", "system", false),
+    ("├─ ", "tools", false),
+    ("├─ ", "inbox", false),
+    ("├─ ", "backup", false),
+    ("├─ ", "temp", false),
+    ("├─ ", "docs", false),
+    ("└─ ", "log", false),
+    ("   ", "readme", false),
 ];
 
 const RADIO_A: [&str; 3] = ["&Full Encryption", "&Quick Encryption", "&No Encryption"];
@@ -59,6 +62,8 @@ struct Show {
     checks: Vec<CheckItem>,
     check_focus: usize,
     btn_sel: usize,
+    /// Botón con clic en curso (se pinta hundido un instante).
+    flash: Option<usize>,
     focus: usize,
     message: String,
     fkeys: Vec<FKeyDef>,
@@ -126,9 +131,9 @@ impl Show {
             ],
             check_focus: 0,
             btn_sel: 0,
+            flash: None,
             focus: 0,
-            message: "Tab cambia de panel · Flechas mueven · Espacio alterna · Esc sale"
-                .to_string(),
+            message: "487,464,960 Bytes Free".to_string(),
             fkeys: vec![
                 FKeyDef::new("F1", "Help"),
                 FKeyDef::new("F2", "Qview"),
@@ -153,7 +158,6 @@ impl Show {
         let bounds = self.screen.bounds();
         let lay = layout(bounds);
         // Copias para el borrow checker.
-        let msg = self.message.clone();
         let tree_sel = self.tree_sel;
         let tree_top = self.tree_top;
         let files_state = self.files_state;
@@ -162,7 +166,9 @@ impl Show {
         let checks = self.checks.clone();
         let check_focus = self.check_focus;
         let btn_sel = self.btn_sel;
+        let flash = self.flash;
         let focus = self.focus;
+        let msg = self.message.clone();
         let active_menu = 3usize;
         let tree_vis = lay.tree_panel.h.saturating_sub(2).max(1) as usize;
         let files_vis = lay.file_panel.h.saturating_sub(3).max(1) as usize;
@@ -183,38 +189,47 @@ impl Show {
             t,
         );
 
-        // Fila de unidades.
-        draw_text(
-            buf,
-            2,
-            2,
-            "ID = DEMO",
-            Attr::new(Color::Black, Color::DarkGrey),
-        );
+        // Fila de unidades con iconos `[A:]`.
+        let drv_attr = Attr::new(Color::Black, Color::DarkGrey);
+        draw_text(buf, 2, 2, "ID = DEMO", drv_attr);
         let mut dx = 14u16;
-        for drv in ["A", "C", "D"] {
-            dx += button(buf, dx, 2, drv, t) + 1;
+        for drv in ['A', 'C', 'D'] {
+            dx += drive(buf, dx, 2, drv, drv_attr, Color::Yellow) + 1;
         }
 
-        // Panel árbol.
+        // Panel árbol con iconos de carpeta.
         if !lay.tree_panel.is_empty() {
             let p = lay.tree_panel;
-            window(buf, p, &WindowOpts::modal("ID = DEMO", t), t);
+            let mut wo = WindowOpts::modal("ID = DEMO", t);
+            wo.controls = true;
+            window(buf, p, &wo, t);
             let vis = tree_vis;
             for i in 0..vis {
                 let y = p.y + 1 + i as u16;
-                let Some(row) = TREE.get(tree_top + i) else {
+                let Some(&(pre, name, open)) = TREE.get(tree_top + i) else {
                     break;
                 };
-                if tree_top + i == tree_sel {
+                let selected = tree_top + i == tree_sel;
+                if selected {
                     buf.fill_rect(
                         Rect::new(p.x + 1, y, p.w.saturating_sub(3), 1),
                         Cell::new(' ', t.popup_text, t.popup),
                     );
-                    draw_text(buf, p.x + 2, y, row, t.list_sel_attr());
-                } else {
-                    draw_text(buf, p.x + 2, y, row, Attr::new(Color::Black, t.window_bg));
                 }
+                let row_attr = if selected {
+                    t.list_sel_attr()
+                } else {
+                    Attr::new(Color::Black, t.window_bg)
+                };
+                let pre_attr = if selected {
+                    t.list_sel_attr()
+                } else {
+                    Attr::new(Color::DarkGrey, t.window_bg)
+                };
+                let mut cx = p.x + 2;
+                cx += draw_text(buf, cx, y, pre, pre_attr);
+                cx += folder(buf, cx, y, open, row_attr, Color::Yellow);
+                draw_text(buf, cx + 1, y, name, row_attr);
             }
             vscrollbar(
                 buf,
@@ -238,7 +253,9 @@ impl Show {
         // Panel archivos (tabla + scrollbar + footer).
         if !lay.file_panel.is_empty() {
             let p = lay.file_panel;
-            window(buf, p, &WindowOpts::modal("C:\\DEMO\\*.*", t), t);
+            let mut wo = WindowOpts::modal("C:\\DEMO\\*.*", t);
+            wo.controls = true;
+            window(buf, p, &wo, t);
             let area = Rect::new(
                 p.x + 1,
                 p.y + 1,
@@ -272,21 +289,22 @@ impl Show {
             }
         }
 
-        // Stats + F-bar + status.
-        if bounds.h >= 3 {
-            let sy = bounds.h - 3;
-            draw_text(buf, 1, sy, &msg, Attr::bold(Color::Yellow, Color::DarkGrey));
-            fkey_bar(buf, bounds.h - 2, &fkey_refs, t);
-            status_bar(buf, "TUI90 v0.0.1", "Alt-F1: Ayuda", t);
+        // F-bar apilada (F sobre el número) + status con mensajes.
+        if bounds.h >= 4 {
+            let fstyle = FKeyStyle::highlight(Color::Yellow, Color::White, Color::DarkGrey);
+            fkey_bar_stacked(buf, bounds.h - 3, &fkey_refs, fstyle);
+            status_bar(buf, &msg, "Alt-F1: Ayuda", t);
         }
 
-        // Diálogo central con radios + casillas + botones.
+        // Diálogo central con radios + casillas + botones (clic animado).
         if !lay.dialog.is_empty() {
             let d = lay.dialog;
-            window(buf, d, &WindowOpts::dialog("Secure Settings", t), t);
+            let mut wo = WindowOpts::dialog("Secure Settings", t);
+            wo.controls = true;
+            window(buf, d, &wo, t);
             let base = t.dialog_attr();
             let hot = Attr::bold(Color::Red, t.dialog);
-            let hattrs = tui90::HotAttrs { base, hot };
+            let cstyle = CheckStyle::new(HotAttrs { base, hot }, GlyphSet::modern());
             // Radios A (izq) y B (der).
             for (i, label) in RADIO_A.iter().enumerate() {
                 tui90::radio_draw(
@@ -296,7 +314,7 @@ impl Show {
                     label,
                     radio_a == i,
                     focus == 2,
-                    hattrs,
+                    cstyle,
                 );
             }
             for (i, label) in RADIO_B.iter().enumerate() {
@@ -307,7 +325,7 @@ impl Show {
                     label,
                     radio_b == i,
                     focus == 3,
-                    hattrs,
+                    cstyle,
                 );
             }
             // Casillas.
@@ -317,11 +335,18 @@ impl Show {
                 } else {
                     (d.x + 30, d.y + 6)
                 };
-                tui90::checkbox_draw(buf, cx, cy, c, focus == 4 && check_focus == i, hattrs);
+                tui90::checkbox_draw(buf, cx, cy, c, focus == 4 && check_focus == i, cstyle);
             }
-            // Botones.
-            let bw = button(buf, d.x + 12, d.y + 11, "OK", t);
-            button(buf, d.x + 12 + bw + 4, d.y + 11, "Cancel", t);
+            // Botones (hundido = clic en curso).
+            let bw = button_draw(buf, d.x + 12, d.y + 11, "OK", t, flash == Some(0));
+            button_draw(
+                buf,
+                d.x + 12 + bw + 4,
+                d.y + 11,
+                "Cancel",
+                t,
+                flash == Some(1),
+            );
             if focus == 5 {
                 let mx = if btn_sel == 0 {
                     d.x + 11
@@ -398,10 +423,12 @@ impl Show {
                 CheckNav::Stay => {}
             },
             _ => match code {
-                KeyCode::Left | KeyCode::Right | KeyCode::Tab => {
+                KeyCode::Left | KeyCode::Right => {
                     self.btn_sel = (self.btn_sel + 1) % 2;
                 }
                 KeyCode::Enter | KeyCode::Char(' ') => {
+                    // Clic animado: el loop pinta hundido, espera y suelta.
+                    self.flash = Some(self.btn_sel);
                     self.message = if self.btn_sel == 0 {
                         "OK: ajustes aplicados (demo).".to_string()
                     } else {
@@ -442,6 +469,12 @@ fn run() -> io::Result<()> {
                     }
                     show.paint();
                     be.present(&show.screen.present_ops())?;
+                    // Frame del clic: hundido 120ms y de vuelta.
+                    if show.flash.take().is_some() {
+                        std::thread::sleep(Duration::from_millis(120));
+                        show.paint();
+                        be.present(&show.screen.present_ops())?;
+                    }
                 }
                 Event::Resize(w, h) => {
                     show.screen.resize(w, h);
