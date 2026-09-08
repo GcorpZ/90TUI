@@ -32,15 +32,19 @@ pub use prim::{
     BUTTON_MIN_WIDTH,
 };
 pub use widgets::{
-    bar_fill_width, check_key, check_width, check_width_styled, checkbox_draw, confirm_draw,
-    confirm_key, confirm_layout, dropdown_draw, dropdown_key, dropdown_overlay_rect, dropdown_size,
-    fkey_bar, fkey_bar_compact, fkey_bar_stacked, fkey_bar_styled, form_draw, form_key, input_draw,
-    input_key, list_draw, list_key, listbox_draw, listbox_key, listbox_visible, menubar_draw,
-    menubar_key, popup_draw, popup_key, popup_layout, popup_size, progress_draw, progress_fill,
-    progressbar_draw, radio_draw, radio_key, table_draw, table_key, BarInfo, CheckItem, CheckNav,
-    CheckStyle, DialogKey, Dropdown, DropdownKey, FKeyStyle, Field, FieldKind, FormKey, FormState,
-    GlyphSet, InputField, InputKey, ListBox, ListNav, MenuBarKey, MenuDef, MenuItem, PopupItem,
-    PopupKey, ProgressBar, ProgressInfo, RadioNav, TableDef, TableState,
+    bar_fill_width, bar_heights, check_key, check_width, check_width_styled, checkbox_draw,
+    confirm_draw, confirm_key, confirm_layout, dropdown_draw, dropdown_key, dropdown_overlay_rect,
+    dropdown_size, filedialog_draw, filedialog_key, filedialog_layout, fkey_bar, fkey_bar_compact,
+    fkey_bar_stacked, fkey_bar_styled, form_draw, form_key, hyperlink_draw, input_draw, input_key,
+    line_dots, list_draw, list_key, listbox_draw, listbox_key, listbox_visible, menubar_draw,
+    menubar_key, pie_sectors, popup_draw, popup_key, popup_layout, popup_size, progress_draw,
+    progress_fill, progressbar_draw, radio_draw, radio_key, statusbar_draw, table_draw, table_key,
+    textarea_draw, textarea_key, textarea_visible, tuichart_draw, Alignment, BarInfo, ChartKind,
+    ChartPoint, CheckItem, CheckNav, CheckStyle, DialogKey, Dropdown, DropdownKey, FKeyStyle,
+    Field, FieldKind, FileDialog, FileDialogKey, FormKey, FormState, GlyphSet, Hyperlink,
+    InputField, InputKey, ListBox, ListNav, MenuBarKey, MenuDef, MenuItem, PopupItem, PopupKey,
+    ProgressBar, ProgressInfo, RadioNav, StatusBar, StatusColumn, TableDef, TableState, TextArea,
+    TextAreaKey, TuiChart,
 };
 
 /// Versión del crate.

@@ -233,6 +233,116 @@ fn superscript_digits(s: &str) -> String {
         .collect()
 }
 
+/// Alineación de una columna de `StatusBar`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Alignment {
+    #[default]
+    Left,
+    Center,
+    Right,
+}
+
+/// Una sección de la `StatusBar`: columna fija con texto actualizable.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StatusColumn {
+    pub start_col: u16,
+    pub max_len: u16,
+    pub alignment: Alignment,
+    pub text: String,
+}
+
+impl StatusColumn {
+    pub fn new(start_col: u16, max_len: u16, alignment: Alignment) -> Self {
+        Self {
+            start_col,
+            max_len,
+            alignment,
+            text: String::new(),
+        }
+    }
+}
+
+/// `StatusBar` avanzada: control horizontal para la penúltima fila,
+/// con secciones dinámicas por columnas fijas.
+///
+/// El bucle principal guarda el `StatusBar` en su estado y actualiza
+/// cada sección con `set_text()` antes de pintar.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StatusBar {
+    pub columns: Vec<StatusColumn>,
+    pub foreground_color: Color,
+    pub background_color: Color,
+    pub border_color: Option<Color>,
+    pub has_shadow: bool,
+}
+
+impl StatusBar {
+    pub fn new(foreground: Color, background: Color) -> Self {
+        Self {
+            columns: Vec::new(),
+            foreground_color: foreground,
+            background_color: background,
+            border_color: None,
+            has_shadow: false,
+        }
+    }
+
+    /// Añade una sección y devuelve su índice (para `set_text`).
+    pub fn add_column(&mut self, start_col: u16, max_len: u16, alignment: Alignment) -> usize {
+        self.columns
+            .push(StatusColumn::new(start_col, max_len, alignment));
+        self.columns.len() - 1
+    }
+
+    /// Actualiza el texto de una sección (recorta si supera `max_len`).
+    pub fn set_text(&mut self, idx: usize, text: &str) {
+        if let Some(col) = self.columns.get_mut(idx) {
+            col.text = text.to_string();
+        }
+    }
+
+    pub fn column_text(&self, idx: usize) -> &str {
+        self.columns.get(idx).map(|c| c.text.as_str()).unwrap_or("")
+    }
+}
+
+/// Dibuja la barra en la fila `y` (típico: `h - 2`, sobre la F-bar).
+pub fn statusbar_draw(buf: &mut Buffer, y: u16, bar: &StatusBar) {
+    if y >= buf.height() {
+        return;
+    }
+    buf.fill_rect(
+        crate::core::Rect::new(0, y, buf.width(), 1),
+        crate::core::Cell::new(' ', bar.foreground_color, bar.background_color),
+    );
+    let attr = Attr::new(bar.foreground_color, bar.background_color);
+    for col in &bar.columns {
+        if col.max_len == 0 {
+            continue;
+        }
+        let fit = crate::prim::fit_text(&col.text, col.max_len);
+        let len = visible_len(&fit);
+        let off = match col.alignment {
+            Alignment::Left => 0,
+            Alignment::Center => col.max_len.saturating_sub(len) / 2,
+            Alignment::Right => col.max_len.saturating_sub(len),
+        };
+        draw_text(buf, col.start_col.saturating_add(off), y, &fit, attr);
+    }
+    if let Some(border) = bar.border_color {
+        let bc = crate::core::Cell::new(' ', border, border);
+        for x in 0..buf.width() {
+            buf.set(x, y.saturating_sub(1), bc);
+            buf.set(x, y.saturating_add(1), bc);
+        }
+    }
+    if bar.has_shadow {
+        for x in 1..buf.width() {
+            blend_below(buf, x, y);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,5 +412,29 @@ mod tests {
         assert_eq!(split_fkey("F10"), ("F", "10"));
         assert_eq!(split_fkey("Esc"), ("Esc", ""));
         assert_eq!(split_fkey("Enter"), ("Enter", ""));
+    }
+
+    #[test]
+    fn statusbar_columns_align_and_update() {
+        let t = Theme::clipper();
+        let mut buf = Buffer::blank(40, 5, t.desktop);
+        let mut bar = StatusBar::new(Color::White, Color::Navy);
+        let left = bar.add_column(1, 10, Alignment::Left);
+        let center = bar.add_column(12, 10, Alignment::Center);
+        let right = bar.add_column(24, 10, Alignment::Right);
+        bar.set_text(left, "Msg");
+        bar.set_text(center, "Mid");
+        bar.set_text(right, "99%");
+        bar.set_text(99, "ignorado"); // índice inválido: no panic
+        statusbar_draw(&mut buf, 3, &bar);
+        assert_eq!(buf.get(0, 3).unwrap().bg, Color::Navy);
+        assert_eq!(buf.get(1, 3).unwrap().ch, 'M'); // izquierda
+        assert_eq!(buf.get(12 + (10 - 3) / 2, 3).unwrap().ch, 'M'); // centro
+        assert_eq!(buf.get(24 + 10 - 3, 3).unwrap().ch, '9'); // derecha
+        assert_eq!(bar.column_text(center), "Mid");
+        // Recorte a max_len.
+        bar.set_text(left, "0123456789ABCDEF");
+        statusbar_draw(&mut buf, 3, &bar);
+        assert_eq!(buf.get(1 + 10, 3).unwrap().bg, Color::Navy); // no se sale
     }
 }

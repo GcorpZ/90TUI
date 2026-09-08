@@ -51,10 +51,10 @@ fn modal_window_with_buttons() {
     assert_eq!(b.get(title_x, r.y).unwrap().ch, 'O');
     assert_eq!(b.get(r.x, r.y).unwrap().bg, t.teal);
 
-    // Botonera inferior (ancho mínimo 10, texto centrado).
+    // Botonera inferior (padding 2 por lado: 7 + 4 = 11).
     let bw = button(&mut b, r.x + 2, r.y + r.h - 2, "Ordenar", t);
-    assert_eq!(bw, tui90::BUTTON_MIN_WIDTH); // "Ordenar" (7) + aire < 10
-    assert_eq!(b.get(r.x + 3, r.y + r.h - 2).unwrap().ch, 'O');
+    assert_eq!(bw, 7 + 4);
+    assert_eq!(b.get(r.x + 4, r.y + r.h - 2).unwrap().ch, 'O');
 
     // Cuerpo gris, sombra negra.
     assert_eq!(b.get(r.x + 1, r.y + 2).unwrap().bg, t.window_bg);

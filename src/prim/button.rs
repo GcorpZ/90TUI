@@ -61,14 +61,11 @@ impl ButtonOpts {
     }
 }
 
-/// Ancho total del botón: mínimo 10; si el texto lo supera, +2 por lado.
+/// Ancho total del botón: padding de 2 por lado (`  TEXTO  `),
+/// con mínimo `BUTTON_MIN_WIDTH` (10) para textos cortos.
 pub fn button_width(label: &str) -> u16 {
     let text = visible_len(label);
-    if text.saturating_add(2) < BUTTON_MIN_WIDTH {
-        BUTTON_MIN_WIDTH
-    } else {
-        text.saturating_add(4)
-    }
+    text.saturating_add(4).max(BUTTON_MIN_WIDTH)
 }
 
 fn resolve_attr(theme: Theme, opts: ButtonOpts) -> Attr {
@@ -196,23 +193,20 @@ pub fn button_draw_opts(
         buf.set(bx.saturating_add(w), by, Cell::with_attr(' ', battr));
     }
     if !pressed && opts.has_shadow {
-        // Sombra CUA exacta por celdas (H = 1):
-        // - columna derecha: (bx+w, by) y esquina (bx+w, by+1),
-        // - fila inferior: (bx+1 .. bx+w+1, by+1).
-        const H: u16 = 1;
-        for dy in 0..H {
-            blend_shadow(buf, bx.saturating_add(w), by.saturating_add(dy), theme);
-        }
+        // Sombra CUA exacta por celdas (botón en `(bx, by)`, `W` x `H=1`):
+        // - lateral derecha: EXACTAMENTE `(x_end, y)` = `(bx+w, by)`,
+        // - inferior: `(x_start+1, y+1)` .. `(x_end, y+1)` inclusive
+        //   (el rango ya incluye la esquina `(bx+w, by+1)` que cierra la L).
+        // Sin `\n` ni celdas extra: mezcla del fondo existente.
+        blend_shadow(buf, bx.saturating_add(w), by, theme);
         for i in 0..w {
             blend_shadow(
                 buf,
                 bx.saturating_add(i).saturating_add(1),
-                by.saturating_add(H),
+                by.saturating_add(1),
                 theme,
             );
         }
-        // Esquina (x+W, y+H): cierra la L.
-        blend_shadow(buf, bx.saturating_add(w), by.saturating_add(H), theme);
     }
     w
 }
@@ -244,8 +238,9 @@ mod tests {
     fn width_has_minimum_and_margins() {
         assert_eq!(button_width("OK"), BUTTON_MIN_WIDTH); // enano → 10
         assert_eq!(button_width(""), BUTTON_MIN_WIDTH);
-        assert_eq!(button_width("Salir"), BUTTON_MIN_WIDTH); // 5+2 < 10
-        assert_eq!(button_width("123456789"), 9 + 4); // supera → +2 por lado
+        assert_eq!(button_width("Salir"), BUTTON_MIN_WIDTH); // 5+4 < 10
+        assert_eq!(button_width("Ordenar"), 7 + 4); // padding 2 por lado
+        assert_eq!(button_width("123456789"), 9 + 4);
     }
 
     #[test]

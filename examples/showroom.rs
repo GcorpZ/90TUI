@@ -21,12 +21,13 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use tui90::{
     button_draw, button_width, check_key, draw_text, drive, dropdown_draw, dropdown_key,
-    enter_screen, fkey_bar_compact, folder, input_draw, input_key, leave_screen, list_key,
-    listbox_draw, listbox_key, menubar_draw, progressbar_draw, radio_key, status_bar, table_draw,
-    table_key, top_bar, vscrollbar, window, Attr, Backend, Buffer, Cell, CheckItem, CheckNav,
-    CheckStyle, Color, CrosstermBackend, Dropdown, DropdownKey, FKeyDef, FKeyStyle, FolderGlyphs,
-    GlyphSet, HotAttrs, InputField, InputKey, ListBox, MenuDef, RadioNav, Rect, Screen, TableDef,
-    TableState, Theme, WindowOpts,
+    enter_screen, filedialog_draw, filedialog_key, fkey_bar_compact, folder, input_draw, input_key,
+    leave_screen, list_key, listbox_draw, listbox_key, menubar_draw, progressbar_draw, radio_key,
+    status_bar, statusbar_draw, table_draw, table_key, top_bar, tuichart_draw, vscrollbar, window,
+    Alignment, Attr, Backend, Buffer, Cell, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle,
+    Color, CrosstermBackend, Dropdown, DropdownKey, FKeyDef, FKeyStyle, FileDialog, FileDialogKey,
+    FolderGlyphs, GlyphSet, HotAttrs, InputField, InputKey, ListBox, MenuDef, RadioNav, Rect,
+    Screen, StatusBar, TableDef, TableState, Theme, TuiChart, WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder()`.
@@ -77,6 +78,16 @@ struct Show {
     focus: usize,
     message: String,
     fkeys: Vec<FKeyDef>,
+    /// Vista de gráficos (F4) en vez del diálogo de controles.
+    charts_view: bool,
+    /// Modal de archivos abierto (captura todo el teclado).
+    file_dialog: Option<FileDialog>,
+    /// `StatusBar` avanzada (columnas dinámicas del bucle principal).
+    status: StatusBar,
+    status_w: u16,
+    col_msg: usize,
+    col_focus: usize,
+    col_info: usize,
 }
 
 struct Layout {
@@ -98,6 +109,70 @@ fn layout(bounds: Rect) -> Layout {
         file_panel,
         dialog,
     }
+}
+
+/// Vista de gráficos (F4): ventana con barras 3D + líneas braille + tarta.
+fn paint_charts(buf: &mut Buffer, area: Rect, t: Theme) {
+    if area.is_empty() {
+        return;
+    }
+    let mut wo = WindowOpts::dialog("Gráficos 90TUI (F4 vuelve)", t);
+    wo.controls = true;
+    window(buf, area, &wo, t);
+    let cw = area.w.saturating_sub(4) / 3; // 3 columnas
+    let ch = area.h.saturating_sub(4);
+    let bars = TuiChart {
+        accent_color: t.teal,
+        has_shadow: true,
+        ..TuiChart::new(
+            ChartKind::Bars3D,
+            "Ventas",
+            vec![
+                ChartPoint::new("Ene", 12.0),
+                ChartPoint::new("Feb", 30.0),
+                ChartPoint::new("Mar", 20.0),
+                ChartPoint::new("Abr", 25.0),
+            ],
+        )
+    };
+    let line = TuiChart {
+        accent_color: Color::Yellow,
+        has_shadow: true,
+        ..TuiChart::new(
+            ChartKind::Line,
+            "Tendencia",
+            vec![
+                ChartPoint::new("1", 2.0),
+                ChartPoint::new("2", 8.0),
+                ChartPoint::new("3", 5.0),
+                ChartPoint::new("4", 9.0),
+                ChartPoint::new("5", 6.0),
+            ],
+        )
+    };
+    let pie = TuiChart {
+        has_shadow: true,
+        ..TuiChart::new(
+            ChartKind::Pie,
+            "Cuota",
+            vec![
+                ChartPoint::new("A", 50.0),
+                ChartPoint::new("B", 30.0),
+                ChartPoint::new("C", 20.0),
+            ],
+        )
+    };
+    tuichart_draw(buf, Rect::new(area.x + 2, area.y + 2, cw, ch), &bars);
+    tuichart_draw(
+        buf,
+        Rect::new(area.x + 2 + cw + 1, area.y + 2, cw, ch),
+        &line,
+    );
+    tuichart_draw(
+        buf,
+        Rect::new(area.x + 2 + (cw + 1) * 2, area.y + 2, cw, ch),
+        &pie,
+    );
 }
 
 impl Show {
@@ -162,15 +237,41 @@ impl Show {
             flash: None,
             focus: 0,
             message: "487,464,960 Bytes Free".to_string(),
+            charts_view: false,
+            file_dialog: None,
+            status: StatusBar::new(Color::White, Color::Navy),
+            status_w: 0,
+            col_msg: 0,
+            col_focus: 0,
+            col_info: 0,
             fkeys: vec![
                 FKeyDef::new("F1", "Help"),
                 FKeyDef::new("F2", "Qview"),
                 FKeyDef::new("F3", "Exit"),
+                FKeyDef::new("F4", "Graphs"),
                 FKeyDef::new("F5", "Copy"),
                 FKeyDef::new("F9", "Select"),
                 FKeyDef::new("F10", "Menu"),
             ],
         }
+    }
+
+    /// Columnas de la StatusBar según el ancho (se recrean al redimensionar).
+    fn ensure_status_cols(&mut self, w: u16) {
+        if self.status_w == w && !self.status.columns.is_empty() {
+            return;
+        }
+        self.status.columns.clear();
+        self.col_msg = self
+            .status
+            .add_column(1, w.saturating_sub(38).max(10), Alignment::Left);
+        self.col_focus = self
+            .status
+            .add_column(w.saturating_sub(36), 14, Alignment::Center);
+        self.col_info = self
+            .status
+            .add_column(w.saturating_sub(20), 19, Alignment::Right);
+        self.status_w = w;
     }
 
     fn tree_vis(&self, lay: &Layout) -> usize {
@@ -197,6 +298,27 @@ impl Show {
         let flash = self.flash;
         let focus = self.focus;
         let msg = self.message.clone();
+        let charts_view = self.charts_view;
+        // StatusBar dinámica (columnas del bucle principal).
+        self.ensure_status_cols(bounds.w);
+        let (cm, cf, ci) = (self.col_msg, self.col_focus, self.col_info);
+        self.status.set_text(cm, &msg);
+        self.status.set_text(
+            cf,
+            &format!("[{}]", FOCUS_NAMES[focus.min(FOCUS_NAMES.len() - 1)]),
+        );
+        self.status.set_text(
+            ci,
+            &format!(
+                "{}% F4:Graphs",
+                self.listbox
+                    .items
+                    .get(self.listbox.selected)
+                    .map(String::as_str)
+                    .unwrap_or("—")
+            ),
+        );
+        let status = self.status.clone();
         let active_menu = 3usize;
         let tree_vis = lay.tree_panel.h.saturating_sub(2).max(1) as usize;
         let files_vis = lay.file_panel.h.saturating_sub(3).max(1) as usize;
@@ -325,23 +447,20 @@ impl Show {
             }
         }
 
-        // F-bar compacta (¹Help ²Qview…) + fila de pista + status.
+        // F-bar compacta (F¹Help F²Qview…) + StatusBar avanzada + status.
         if bounds.h >= 4 {
             let fstyle = FKeyStyle::highlight(Color::Yellow, Color::White, Color::DarkGrey);
             fkey_bar_compact(buf, bounds.h - 3, &fkey_refs, fstyle);
-            draw_text(
-                buf,
-                1,
-                bounds.h - 2,
-                "Tab panel · Espacio alterna · Enter acepta",
-                Attr::new(Color::Black, Color::DarkGrey),
-            );
+            // StatusBar justo por encima de las teclas de función.
+            statusbar_draw(buf, bounds.h - 4, &status);
             status_bar(buf, &msg, "Alt-F1: Ayuda", t);
         }
 
-        // Diálogo central: todos los controles (dropdown se pinta al final,
-        // para que su overlay quede encima).
-        if !lay.dialog.is_empty() {
+        if charts_view {
+            paint_charts(buf, lay.dialog, t);
+        } else if !lay.dialog.is_empty() {
+            // Diálogo central: todos los controles (dropdown se pinta al final,
+            // para que su overlay quede encima).
             let d = lay.dialog;
             let mut wo = WindowOpts::dialog("Showroom 90TUI", t);
             wo.controls = true;
@@ -465,26 +584,19 @@ impl Show {
                 draw_text(buf, lx - 1, d.y + 14, "►", Attr::bold(Color::Red, t.dialog));
             }
 
-            // Botones (ancho mínimo 10, centrados).
+            // Botones (padding 2, centrados): OK · Cancel · Abrir… (FileDialog).
             let bw_ok = button_width("OK");
             let bw_cancel = button_width("Cancel");
-            let total = bw_ok + 4 + bw_cancel;
+            let bw_open = button_width("Abrir…");
+            let total = bw_ok + 2 + bw_cancel + 2 + bw_open;
             let bx0 = d.x + (d.w.saturating_sub(total)) / 2;
+            let bx1 = bx0 + bw_ok + 2;
+            let bx2 = bx1 + bw_cancel + 2;
             button_draw(buf, bx0, d.y + 16, "OK", t, flash == Some(0));
-            button_draw(
-                buf,
-                bx0 + bw_ok + 4,
-                d.y + 16,
-                "Cancel",
-                t,
-                flash == Some(1),
-            );
+            button_draw(buf, bx1, d.y + 16, "Cancel", t, flash == Some(1));
+            button_draw(buf, bx2, d.y + 16, "Abrir…", t, flash == Some(2));
             if focus == 10 {
-                let mx = if btn_sel == 0 {
-                    bx0 - 1
-                } else {
-                    bx0 + bw_ok + 4 - 1
-                };
+                let mx = [bx0, bx1, bx2][btn_sel.min(2)] - 1;
                 draw_text(buf, mx, d.y + 16, "►", Attr::bold(Color::Red, t.dialog));
             }
             // Etiqueta de foco actual (ancho en celdas, con saturación).
@@ -496,10 +608,37 @@ impl Show {
             // Dropdown al final: línea + overlay encima de todo.
             dropdown_draw(buf, dd_rect, &self.dropdown, t);
         }
+
+        // Modal de archivos, encima de absolutamente todo.
+        if let Some(dlg) = &self.file_dialog {
+            filedialog_draw(buf, bounds, dlg, t);
+        }
     }
 
     /// Devuelve `false` para salir.
     fn key(&mut self, code: KeyCode) -> bool {
+        // Modal de archivos: captura todo (Esc cancela, Enter acepta).
+        if self.file_dialog.is_some() {
+            if code == KeyCode::Esc {
+                self.file_dialog = None;
+                self.message = "Explorador cancelado.".to_string();
+                return true;
+            }
+            if let Some(dlg) = self.file_dialog.as_mut() {
+                match filedialog_key(dlg, code) {
+                    FileDialogKey::Accepted(p) => {
+                        self.message = format!("Elegido: {}.", p.display());
+                        self.file_dialog = None;
+                    }
+                    FileDialogKey::Cancelled => {
+                        self.message = "Explorador cancelado.".to_string();
+                        self.file_dialog = None;
+                    }
+                    _ => {}
+                }
+            }
+            return true;
+        }
         if code == KeyCode::Esc {
             // Si el dropdown está abierto, Esc primero lo cancela.
             if self.dropdown.is_open {
@@ -511,6 +650,16 @@ impl Show {
         // F10 también sale (como en la referencia).
         if matches!(code, KeyCode::F(10)) {
             return false;
+        }
+        // F4 alterna la vista de gráficos.
+        if matches!(code, KeyCode::F(4)) {
+            self.charts_view = !self.charts_view;
+            self.message = if self.charts_view {
+                "Vista de gráficos (F4 vuelve).".to_string()
+            } else {
+                "Vista de controles.".to_string()
+            };
+            return true;
         }
         let lay = layout(self.screen.bounds());
         if code == KeyCode::Tab {
@@ -617,16 +766,25 @@ impl Show {
             },
             _ => match code {
                 KeyCode::Left | KeyCode::Right => {
-                    self.btn_sel = (self.btn_sel + 1) % 2;
+                    self.btn_sel = (self.btn_sel + 1) % 3;
                 }
                 KeyCode::Enter | KeyCode::Char(' ') => {
                     // Clic animado: el loop pinta hundido, espera y suelta.
                     self.flash = Some(self.btn_sel);
-                    self.message = if self.btn_sel == 0 {
-                        "OK: ajustes aplicados (demo).".to_string()
-                    } else {
-                        "Cancelado (demo).".to_string()
-                    };
+                    match self.btn_sel {
+                        0 => {
+                            self.message = "OK: ajustes aplicados (demo).".to_string();
+                        }
+                        1 => {
+                            self.message = "Cancelado (demo).".to_string();
+                        }
+                        _ => {
+                            let cwd = std::env::current_dir()
+                                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+                            self.file_dialog = Some(FileDialog::new(&cwd));
+                            self.message = "Explorador abierto.".to_string();
+                        }
+                    }
                 }
                 _ => {}
             },

@@ -26,7 +26,7 @@ pub struct WindowOpts {
     /// `border_color` global: `Some` pinta marco de 1 celda en el borde
     /// del rect; `None` = bloque sin marco (look Clipper por defecto).
     pub border_color: Option<Color>,
-    /// Pinta caja de cierre `[■]` (`\u{25a0}`) en `(x+1, y)` del título.
+    /// Pinta caja de cierre `[■]` (`\u{25a0}`) en relativo `(x=2, y=0)`.
     pub controls: bool,
 }
 
@@ -114,9 +114,11 @@ pub fn window(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, theme: Theme) {
             dim: false,
         };
         draw_text(buf, tx, rect.y, &fit, attr);
-        // Caja de cierre `[■]` (`\u{25a0}`) sobre la barra, en `(x+1, y)`.
+        // Caja de cierre `[■]` (`\u{25a0}`) incrustada en la línea superior,
+        // coordenada relativa interna `(x=2, y=0)`: reemplaza esa porción
+        // de la línea horizontal del borde/título.
         if opts.controls && rect.w >= 8 {
-            super::icons::win_close(buf, rect.x.saturating_add(1), rect.y, attr, Color::Yellow);
+            super::icons::win_close(buf, rect.x.saturating_add(2), rect.y, attr, Color::Yellow);
         }
     }
     // Borde opt-in: marco de 1 celda en el perímetro (no cambia el tamaño).
@@ -175,11 +177,11 @@ mod tests {
         let mut opts = WindowOpts::modal("ORDENAR", t);
         opts.controls = true;
         window(&mut b, r, &opts, t);
-        // `[■]` en (x+1, y): corchetes + `\u{25a0}` amarillo.
-        assert_eq!(b.get(6, 3).unwrap().ch, '[');
-        assert_eq!(b.get(7, 3).unwrap().ch, '\u{25a0}');
-        assert_eq!(b.get(7, 3).unwrap().fg, Color::Yellow);
-        assert_eq!(b.get(8, 3).unwrap().ch, ']');
+        // `[■]` en relativo (x=2, y=0): corchetes + `\u{25a0}` amarillo.
+        assert_eq!(b.get(7, 3).unwrap().ch, '[');
+        assert_eq!(b.get(8, 3).unwrap().ch, '\u{25a0}');
+        assert_eq!(b.get(8, 3).unwrap().fg, Color::Yellow);
+        assert_eq!(b.get(9, 3).unwrap().ch, ']');
         // Borde opt-in: perímetro en el color pedido.
         let mut bordered = WindowOpts::modal("B", t);
         bordered.border_color = Some(Color::Red);

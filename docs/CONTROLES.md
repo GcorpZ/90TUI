@@ -14,21 +14,22 @@ Parámetros globales de estilo (`core::WidgetStyle`, colores `Color` 16 ANSI,
 no RGB): `foreground_color` / `background_color` / `border_color` /
 `has_shadow` — presentes en `ButtonOpts`, `WindowOpts` (`shadow` +
 `border_color`), `CheckStyle`, `FKeyStyle` (`has_shadow`), `Dropdown`,
-`InputField`, `ProgressBar` y `ListBox`.
+`InputField`, `ProgressBar`, `ListBox`, `StatusBar`, `FileDialog`,
+`TextArea`, `Hyperlink` y `TuiChart`.
 
 ## prim — primitivas de dibujo (`tui90::prim`)
 
 | Función | Parámetros | Devuelve | Efecto |
 |---|---|---|---|
-| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | bloque + título centrado + sombra + caja `[■]` (`\u{25a0}`) en `(x+1,y)` opt |
+| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | bloque + título centrado + sombra + caja `[■]` (`\u{25a0}`) en relativo `(x=2,y=0)` opt |
 | `WindowOpts::modal/form/dialog(título, theme)` | `&str`, `Theme` | `WindowOpts` | presets gris/negro/menta (`.controls`, `.shadow_style`, `.border_color` opt, `.shadow`=`has_shadow`) |
 | `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra fantasma (offset 2,1): conserva glifo+color, atenúa con `dim` ANSI |
 | `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes (botones = sólida) |
 | `Cell.dim` / `Attr::faint` | flag | — | `\x1b[2m` real en el backend |
-| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal, ancho mín. 10 centrado (largo: +2 por lado), sombra CUA mezclada |
+| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal, padding 2 por lado (`  TEXTO  `, mín. 10), sombra CUA exacta `(x_end,y)` + `(x_start+1..x_end, y+1)` mezclada |
 | `button_draw(..., pressed)` | + `bool` | `u16` ancho | hundido (+1,+1, sin sombra) si `pressed` |
 | `button_ex / button_draw_ex / button_draw_opts` | + `ButtonOpts` | `u16` ancho | estilo global (`foreground/background/border_color`, `has_shadow`) |
-| `button_width(label)` | `&str` | `u16` | mín. 10, si supera: texto+4 |
+| `button_width(label)` | `&str` | `u16` | texto+4 con mínimo 10 |
 | `BUTTON_MIN_WIDTH` | const `= 10` | — | ancho mínimo de botón |
 | `draw_hot_label(buf, x, y, s, base, hot)` | texto con `&` | `u16` ancho | etiqueta con hotkey |
 | `draw_text / fit_text / visible_len / parse_hotkey / hot_key_of / base_on` | — | — | utilidades de texto y `…` |
@@ -62,9 +63,14 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `progressbar_draw(buf, rect, bar)` | `ProgressBar{pct 0-100, fg/bg, border_color, has_shadow, show_pct}` | `█` `\u{2588}` / `░` `\u{2591}` + `NN%` si cabe |
 | `listbox_draw(buf, rect, lb)` | `ListBox{items, selected, top, fg/bg/highlight, border_color, has_shadow}` | scrollbar `▲`/`▼` + `█` proporcional; `listbox_key` (flechas/PgUp/PgDn/letra) |
 | `fkey_bar(buf, y, keys, theme)` | `&[(&str,&str)]` | 1 fila clásica |
-| `fkey_bar_styled(buf, y, keys, FKeyStyle)` | `FKeyStyle{key_fg/bg, label_fg/bg}` | a) cantidad b) etiquetas d/e) colores |
+| `fkey_bar_styled(buf, y, keys, FKeyStyle)` | `FKeyStyle{key_fg/bg, label_fg/bg, has_shadow}` | a) cantidad b) etiquetas d/e) colores |
 | `fkey_bar_stacked(buf, y, keys, style)` | 2 filas | F sobre el número, alineados |
-| `fkey_bar_compact(buf, y, keys, style)` | 1 fila | `¹Help ²Qview ¹⁰Menu` (superíndices) |
+| `fkey_bar_compact(buf, y, keys, style)` | 1 fila | `F¹Help F²Qview F¹⁰Menu` (F + superíndice) |
+| `statusbar_draw(buf, y, bar)` | `StatusBar` + `add_column(start_col, max_len, Alignment)` | penúltima fila por secciones; `set_text(i)` dinámico |
+| `filedialog_draw(buf, screen, dlg, theme)` | `FileDialog::new(&ruta)` (`std::fs`, árbol + `ListBox`) | `filedialog_key` → `Accepted(PathBuf)` / `Cancelled`; Enter entra/elige, Bksp sube |
+| `textarea_draw(buf, rect, area, focused)` | `TextArea{lines, cursor, max_chars, fg/bg/active_bg, border_color, has_shadow}` | `textarea_key` → Enter parte línea, flechas/PgUp/PgDn navegan, scroll vertical |
+| `hyperlink_draw(buf, x, y, link)` | `Hyperlink{text, url}` | texto negrita coloreado; `osc8_sequence()` = `\x1b]8;;URL\x1b\\TEXTO\x1b]8;;\x1b\\` clickeable |
+| `tuichart_draw(buf, rect, chart)` | `TuiChart{kind: Bars3D/Line/Pie, series: [(label, value)]}` | barras `█`+`▒` 3D · líneas braille `⠃⠇⠽` · tarta sectorial + leyenda `%` |
 | `popup_size(items)` | — | `(w, h)` para layout manual |
 
 ## app — shell (`tui90::app`)
