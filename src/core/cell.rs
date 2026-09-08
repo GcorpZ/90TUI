@@ -6,12 +6,14 @@
 use super::color::{Attr, Color};
 
 /// Una posición de la parrilla 80x25 (o cualquier tamaño moderno).
+/// `dim` = atenuado ANSI (`\x1b[2m`): lo usan las sombras fantasma.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Cell {
     pub ch: char,
     pub fg: Color,
     pub bg: Color,
     pub bold: bool,
+    pub dim: bool,
 }
 
 impl Cell {
@@ -21,6 +23,7 @@ impl Cell {
             fg,
             bg,
             bold: false,
+            dim: false,
         }
     }
 
@@ -30,6 +33,18 @@ impl Cell {
             fg,
             bg,
             bold: true,
+            dim: false,
+        }
+    }
+
+    /// Celda atenuada (sombras): mismo color, con `dim`.
+    pub fn faint(ch: char, fg: Color, bg: Color) -> Self {
+        Self {
+            ch,
+            fg,
+            bg,
+            bold: false,
+            dim: true,
         }
     }
 
@@ -39,6 +54,7 @@ impl Cell {
             fg: attr.fg,
             bg: attr.bg,
             bold: attr.bold,
+            dim: attr.dim,
         }
     }
 
@@ -50,6 +66,7 @@ impl Cell {
             fg: bg,
             bg,
             bold: false,
+            dim: false,
         }
     }
 
@@ -58,6 +75,7 @@ impl Cell {
             fg: self.fg,
             bg: self.bg,
             bold: self.bold,
+            dim: self.dim,
         }
     }
 }

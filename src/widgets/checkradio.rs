@@ -16,9 +16,10 @@ pub struct CheckItem {
     pub checked: bool,
 }
 
-/// Set de glifos: círculos/cajas reales o ASCII seguro.
-/// Moderno (`○ ● ☐ ☑`) necesita fuente con esos glifos (DejaVu, Cascadia,
-/// Consolas los traen); `ascii()` funciona en cualquier lado.
+/// Set de glifos: check real y círculo que se llena, o ASCII seguro.
+/// Moderno: `[✓]` (U+2713) y `(•)` (U+2022); apagados en blanco.
+/// Necesita fuente con esos glifos (cualquier Nerd Font, DejaVu, Cascadia
+/// o Consolas los traen); `ascii()` funciona en cualquier lado.
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphSet {
     pub check_on: char,
@@ -28,22 +29,22 @@ pub struct GlyphSet {
 }
 
 impl GlyphSet {
-    /// Círculo que se llena + caja con check (como la referencia).
+    /// `[✓]` / `[ ]`, `(•)` / `( )` — como la referencia.
     pub fn modern() -> Self {
         Self {
-            check_on: '☑',
-            check_off: '☐',
-            radio_on: '●',
-            radio_off: '○',
+            check_on: '✓',
+            check_off: ' ',
+            radio_on: '•',
+            radio_off: ' ',
         }
     }
 
-    /// Solo ASCII: `[X]`/`[ ]`, `(•)`/`( )`.
+    /// Solo ASCII: `[X]`/`[ ]`, `(*)`/`( )`.
     pub fn ascii() -> Self {
         Self {
             check_on: 'X',
             check_off: ' ',
-            radio_on: '•',
+            radio_on: '*',
             radio_off: ' ',
         }
     }
@@ -232,19 +233,19 @@ mod tests {
             style,
         );
         assert_eq!(b.get(2, 1).unwrap().ch, '[');
-        assert_eq!(b.get(3, 1).unwrap().ch, '☑');
+        assert_eq!(b.get(3, 1).unwrap().ch, '✓');
         assert_eq!(b.get(6, 1).unwrap().fg, Color::Red); // hotkey C
         assert!(w >= 4 + visible_len("Compresión"));
         let w2 = radio_draw(&mut b, 2, 2, "Rápido", true, false, style);
         assert_eq!(b.get(2, 2).unwrap().ch, '(');
-        assert_eq!(b.get(3, 2).unwrap().ch, '●');
+        assert_eq!(b.get(3, 2).unwrap().ch, '•');
         assert!(w2 > 4);
         // Fallback ASCII sin unicode.
         let ascii = CheckStyle::new(HotAttrs { base, hot }, GlyphSet::ascii());
         checkbox_draw(&mut b, 2, 3, &CheckItem::new("X", true), false, ascii);
         assert_eq!(b.get(3, 3).unwrap().ch, 'X');
         radio_draw(&mut b, 2, 4, "R", true, false, ascii);
-        assert_eq!(b.get(3, 4).unwrap().ch, '•');
+        assert_eq!(b.get(3, 4).unwrap().ch, '*');
     }
 
     #[test]

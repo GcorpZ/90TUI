@@ -7,13 +7,52 @@
 
 use crate::core::{Attr, Buffer, Cell, Color};
 
-/// Carpeta: `►■` cerrada / `▼■` abierta (marcador + cuadro en acento).
-/// Devuelve el ancho ocupado (2).
-pub fn folder(buf: &mut Buffer, x: u16, y: u16, open: bool, attr: Attr, accent: Color) -> u16 {
-    let mark = if open { '▼' } else { '►' };
-    buf.set(x, y, Cell::with_attr(mark, attr));
-    buf.set(x.saturating_add(1), y, Cell::new('■', accent, attr.bg));
-    2
+/// Glifos de carpeta configurables por el desarrollador.
+/// Por defecto, el icono nativo de Nerd Fonts (una sola celda).
+#[derive(Clone, Copy, Debug)]
+pub struct FolderGlyphs {
+    pub closed: char,
+    pub open: char,
+}
+
+impl FolderGlyphs {
+    /// Nerd Fonts: U+F07B (cerrada) / U+F07C (abierta).
+    pub fn nerd() -> Self {
+        Self {
+            closed: '\u{f07b}',
+            open: '\u{f07c}',
+        }
+    }
+
+    /// Solo ASCII seguro: `►` / `▼`.
+    pub fn ascii() -> Self {
+        Self {
+            closed: '►',
+            open: '▼',
+        }
+    }
+}
+
+impl Default for FolderGlyphs {
+    fn default() -> Self {
+        Self::nerd()
+    }
+}
+
+/// Carpeta en una celda (`attr` para el fondo, `accent` para el glifo).
+/// Devuelve el ancho ocupado (1).
+pub fn folder(
+    buf: &mut Buffer,
+    x: u16,
+    y: u16,
+    open: bool,
+    attr: Attr,
+    accent: Color,
+    glyphs: FolderGlyphs,
+) -> u16 {
+    let g = if open { glyphs.open } else { glyphs.closed };
+    buf.set(x, y, Cell::new(g, accent, attr.bg));
+    1
 }
 
 /// Unidad de disco: `[C:]` con la letra en acento. Devuelve 4.
@@ -61,15 +100,19 @@ mod tests {
     }
 
     #[test]
-    fn folder_marks_open_state() {
+    fn folder_uses_configurable_glyphs() {
         let (a, t) = attr();
         let mut b = Buffer::blank(20, 4, t.desktop);
-        folder(&mut b, 1, 1, false, a, Color::Yellow);
-        folder(&mut b, 1, 2, true, a, Color::Yellow);
-        assert_eq!(b.get(1, 1).unwrap().ch, '►');
-        assert_eq!(b.get(2, 1).unwrap().ch, '■');
-        assert_eq!(b.get(2, 1).unwrap().fg, Color::Yellow);
-        assert_eq!(b.get(1, 2).unwrap().ch, '▼');
+        assert_eq!(
+            folder(&mut b, 1, 1, false, a, Color::Yellow, FolderGlyphs::nerd()),
+            1
+        );
+        assert_eq!(b.get(1, 1).unwrap().ch, '\u{f07b}');
+        assert_eq!(b.get(1, 1).unwrap().fg, Color::Yellow);
+        folder(&mut b, 1, 2, true, a, Color::Yellow, FolderGlyphs::nerd());
+        assert_eq!(b.get(1, 2).unwrap().ch, '\u{f07c}');
+        folder(&mut b, 1, 3, false, a, Color::Yellow, FolderGlyphs::ascii());
+        assert_eq!(b.get(1, 3).unwrap().ch, '►');
     }
 
     #[test]

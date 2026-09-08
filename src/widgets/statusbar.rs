@@ -131,6 +131,55 @@ fn style_label(s: FKeyStyle) -> Attr {
     Attr::new(s.label_fg, s.label_bg)
 }
 
+/// Fila compacta estilo referencia: número en superíndice + etiqueta.
+/// `F1 Help` → `¹Help`, `F10 Menu` → `¹⁰Menu`, `Esc Salir` tal cual.
+/// El número va en colores Fx (típico: invertidos o amarillos).
+pub fn fkey_bar_compact(buf: &mut Buffer, y: u16, keys: &[(&str, &str)], style: FKeyStyle) -> u16 {
+    if y >= buf.height() {
+        return 0;
+    }
+    let ka = style_key(style);
+    let la = style_label(style);
+    let mut cx = 1u16;
+    for (k, label) in keys {
+        let num = compact_num(k);
+        let w = visible_len(&num).saturating_add(visible_len(label));
+        if cx.saturating_add(w) > buf.width() {
+            break;
+        }
+        draw_text(buf, cx, y, &num, ka);
+        draw_text(buf, cx.saturating_add(visible_len(&num)), y, label, la);
+        cx = cx.saturating_add(w).saturating_add(2);
+    }
+    cx
+}
+
+/// `"F2"` → `"²"`, `"F10"` → `"¹⁰"`; lo demás tal cual.
+fn compact_num(k: &str) -> String {
+    match k.strip_prefix(&['F', 'f'][..]) {
+        Some(n) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => superscript_digits(n),
+        _ => k.to_string(),
+    }
+}
+
+fn superscript_digits(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '0' => '⁰',
+            '1' => '¹',
+            '2' => '²',
+            '3' => '³',
+            '4' => '⁴',
+            '5' => '⁵',
+            '6' => '⁶',
+            '7' => '⁷',
+            '8' => '⁸',
+            '9' => '⁹',
+            c => c,
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,6 +219,25 @@ mod tests {
         assert_eq!(buf.get(x2, 22).unwrap().ch, 'F');
         assert_eq!(buf.get(x2, 23).unwrap().ch, '1');
         assert_eq!(buf.get(x2 + 1, 23).unwrap().ch, '0');
+    }
+
+    #[test]
+    fn compact_uses_superscripts() {
+        let t = Theme::clipper();
+        let mut buf = Buffer::blank(60, 25, t.desktop);
+        let style = FKeyStyle::highlight(Color::Yellow, Color::White, t.desktop);
+        fkey_bar_compact(
+            &mut buf,
+            24,
+            &[("F2", "Help"), ("F10", "Menu"), ("Esc", "Salir")],
+            style,
+        );
+        assert_eq!(buf.get(1, 24).unwrap().ch, '²');
+        assert_eq!(buf.get(1, 24).unwrap().fg, Color::Yellow);
+        assert_eq!(buf.get(2, 24).unwrap().ch, 'H');
+        let x2 = 1 + 1 + 4 + 2; // ²Help + aire
+        assert_eq!(buf.get(x2, 24).unwrap().ch, '¹');
+        assert_eq!(buf.get(x2 + 1, 24).unwrap().ch, '⁰');
     }
 
     #[test]

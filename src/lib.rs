@@ -28,15 +28,16 @@ pub use prim::{
     button, button_draw, button_width, draw_hot_label, draw_text, drive, fit_text, folder,
     hot_key_of, hsep, parse_hotkey, shadow, shadow_offset, shadow_solid, shadow_stipple,
     shadow_styled, status_bar, top_bar, visible_len, vscrollbar, win_close, win_min, window,
-    HotAttrs, ShadowStyle, WindowOpts,
+    FolderGlyphs, HotAttrs, ShadowStyle, WindowOpts,
 };
 pub use widgets::{
     bar_fill_width, check_key, check_width, checkbox_draw, confirm_draw, confirm_key,
-    confirm_layout, fkey_bar, fkey_bar_stacked, fkey_bar_styled, form_draw, form_key, list_draw,
-    list_key, menubar_draw, menubar_key, popup_draw, popup_key, popup_layout, popup_size,
-    progress_draw, radio_draw, radio_key, table_draw, table_key, BarInfo, CheckItem, CheckNav,
-    CheckStyle, DialogKey, FKeyStyle, Field, FieldKind, FormKey, FormState, GlyphSet, MenuBarKey,
-    MenuDef, MenuItem, PopupItem, PopupKey, ProgressInfo, RadioNav, TableDef, TableState,
+    confirm_layout, fkey_bar, fkey_bar_compact, fkey_bar_stacked, fkey_bar_styled, form_draw,
+    form_key, list_draw, list_key, menubar_draw, menubar_key, popup_draw, popup_key, popup_layout,
+    popup_size, progress_draw, radio_draw, radio_key, table_draw, table_key, BarInfo, CheckItem,
+    CheckNav, CheckStyle, DialogKey, FKeyStyle, Field, FieldKind, FormKey, FormState, GlyphSet,
+    MenuBarKey, MenuDef, MenuItem, PopupItem, PopupKey, ProgressInfo, RadioNav, TableDef,
+    TableState,
 };
 
 /// Versión del crate.

@@ -25,5 +25,5 @@ pub use list::{list_draw, list_key};
 pub use menubar::{menubar_draw, menubar_key, MenuBarKey, MenuDef, MenuItem};
 pub use popup::{popup_draw, popup_key, popup_layout, popup_size, PopupItem, PopupKey};
 pub use progress::{bar_fill_width, progress_draw, BarInfo, ProgressInfo};
-pub use statusbar::{fkey_bar, fkey_bar_stacked, fkey_bar_styled, FKeyStyle};
+pub use statusbar::{fkey_bar, fkey_bar_compact, fkey_bar_stacked, fkey_bar_styled, FKeyStyle};
 pub use table::{table_draw, table_key, TableDef, TableState};

@@ -91,6 +91,7 @@ pub fn window(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, theme: Theme) {
             fg: opts.title_fg,
             bg: opts.title_bg,
             bold: opts.title_bold,
+            dim: false,
         };
         draw_text(buf, tx, rect.y, &fit, attr);
         // Caja de cierre sobre la barra (después del título para que se vea).

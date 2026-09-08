@@ -18,11 +18,11 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use tui90::{
-    button_draw, check_key, draw_text, drive, enter_screen, fkey_bar_stacked, folder, leave_screen,
+    button_draw, check_key, draw_text, drive, enter_screen, fkey_bar_compact, folder, leave_screen,
     list_key, menubar_draw, radio_key, status_bar, table_draw, table_key, top_bar, vscrollbar,
     window, Attr, Backend, Buffer, Cell, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend,
-    FKeyDef, FKeyStyle, GlyphSet, HotAttrs, MenuDef, RadioNav, Rect, Screen, TableDef, TableState,
-    Theme, WindowOpts,
+    FKeyDef, FKeyStyle, FolderGlyphs, GlyphSet, HotAttrs, MenuDef, RadioNav, Rect, Screen,
+    TableDef, TableState, Theme, WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder()`.
@@ -228,7 +228,15 @@ impl Show {
                 };
                 let mut cx = p.x + 2;
                 cx += draw_text(buf, cx, y, pre, pre_attr);
-                cx += folder(buf, cx, y, open, row_attr, Color::Yellow);
+                cx += folder(
+                    buf,
+                    cx,
+                    y,
+                    open,
+                    row_attr,
+                    Color::Yellow,
+                    FolderGlyphs::nerd(),
+                );
                 draw_text(buf, cx + 1, y, name, row_attr);
             }
             vscrollbar(
@@ -289,10 +297,17 @@ impl Show {
             }
         }
 
-        // F-bar apilada (F sobre el número) + status con mensajes.
+        // F-bar compacta (¹Help ²Qview…) + fila de pista + status.
         if bounds.h >= 4 {
             let fstyle = FKeyStyle::highlight(Color::Yellow, Color::White, Color::DarkGrey);
-            fkey_bar_stacked(buf, bounds.h - 3, &fkey_refs, fstyle);
+            fkey_bar_compact(buf, bounds.h - 3, &fkey_refs, fstyle);
+            draw_text(
+                buf,
+                1,
+                bounds.h - 2,
+                "Tab panel · Espacio alterna · Enter acepta",
+                Attr::new(Color::Black, Color::DarkGrey),
+            );
             status_bar(buf, &msg, "Alt-F1: Ayuda", t);
         }
 

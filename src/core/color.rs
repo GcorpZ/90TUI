@@ -44,12 +44,13 @@ impl Color {
     }
 }
 
-/// Par fg/bg/negrita listo para pintar una celda o un span.
+/// Par fg/bg/negrita/atenuado listo para pintar una celda o un span.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Attr {
     pub fg: Color,
     pub bg: Color,
     pub bold: bool,
+    pub dim: bool,
 }
 
 impl Attr {
@@ -58,11 +59,27 @@ impl Attr {
             fg,
             bg,
             bold: false,
+            dim: false,
         }
     }
 
     pub fn bold(fg: Color, bg: Color) -> Self {
-        Self { fg, bg, bold: true }
+        Self {
+            fg,
+            bg,
+            bold: true,
+            dim: false,
+        }
+    }
+
+    /// Atenuado ANSI (`\x1b[2m`): sombras fantasma.
+    pub fn faint(fg: Color, bg: Color) -> Self {
+        Self {
+            fg,
+            bg,
+            bold: false,
+            dim: true,
+        }
     }
 }
 

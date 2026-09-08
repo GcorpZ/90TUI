@@ -50,8 +50,12 @@ impl<W: Write> Backend for CrosstermBackend<W> {
             if op.cell.bold {
                 self.out.queue(SetAttribute(Attribute::Bold))?;
             }
+            if op.cell.dim {
+                // Atenuación ANSI (\x1b[2m): sombras fantasma.
+                self.out.queue(SetAttribute(Attribute::Dim))?;
+            }
             self.out.queue(Print(op.cell.ch))?;
-            if op.cell.bold {
+            if op.cell.bold || op.cell.dim {
                 // Restablece para no "contagiar" la siguiente celda.
                 // La próxima op reprograma fg/bg de todos modos.
                 self.out.queue(SetAttribute(Attribute::Reset))?;

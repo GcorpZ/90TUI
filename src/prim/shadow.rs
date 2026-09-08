@@ -11,7 +11,7 @@
 //!
 //! Se pinta PRIMERO (debajo) y el cuerpo encima.
 
-use crate::core::{Buffer, Cell, Color, Rect, Theme};
+use crate::core::{Buffer, Cell, Rect, Theme};
 
 /// Estilo de sombra.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -73,17 +73,19 @@ pub fn shadow_styled(
                 ShadowStyle::Solid => Cell::new(' ', theme.shadow, theme.shadow),
                 ShadowStyle::Translucent => Cell {
                     ch: old.ch,
-                    fg: Color::DarkGrey,
+                    fg: old.fg,
                     bg: theme.shadow,
                     bold: false,
+                    dim: true,
                 },
                 ShadowStyle::Stipple => {
                     if (x + y) % 2 == 0 {
                         Cell {
                             ch: old.ch,
-                            fg: Color::DarkGrey,
+                            fg: old.fg,
                             bg: theme.shadow,
                             bold: false,
+                            dim: true,
                         }
                     } else {
                         continue; // celda intacta: el otro 50% del tramado
@@ -98,6 +100,7 @@ pub fn shadow_styled(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::Color;
 
     #[test]
     fn translucent_keeps_glyph_and_darkens() {
@@ -105,11 +108,12 @@ mod tests {
         let mut b = Buffer::blank(10, 6, Color::White);
         b.text(3, 2, "AB", Color::Black, Color::White);
         shadow(&mut b, Rect::new(1, 1, 4, 2), t);
-        // La sombra cae en (3,2): el glifo sobrevive, aplastado a oscuro.
+        // La sombra cae en (3,2): glifo y color intactos, atenuados.
         let c = b.get(3, 2).unwrap();
         assert_eq!(c.ch, 'A');
         assert_eq!(c.bg, t.shadow);
-        assert_eq!(c.fg, Color::DarkGrey);
+        assert_eq!(c.fg, Color::Black);
+        assert!(c.dim);
         // El cuerpo original no se toca.
         assert_eq!(b.get(1, 1).unwrap().bg, Color::White);
     }

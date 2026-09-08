@@ -17,7 +17,9 @@ colores siempre vía `Theme` (nunca literales), todo dibuja sobre
 |---|---|---|---|
 | `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | bloque + título centrado + sombra + caja `[■]` opt |
 | `WindowOpts::modal/form/dialog(título, theme)` | `&str`, `Theme` | `WindowOpts` | presets gris/negro/menta (`.controls`, `.shadow_style` ajustables) |
-| `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra fantasma (offset 2,1) |
+| `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra fantasma (offset 2,1): conserva glifo+color, atenúa con `dim` ANSI |
+| `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes (botones = sólida) |
+| `Cell.dim` / `Attr::faint` | flag | — | `\x1b[2m` real en el backend |
 | `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes de sombra |
 | `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal + sombra solo-abajo |
 | `button_draw(..., pressed)` | + `bool` | `u16` ancho | hundido (+1,+1, sin sombra) si `pressed` |
@@ -27,7 +29,7 @@ colores siempre vía `Theme` (nunca literales), todo dibuja sobre
 | `hsep(buf, y, x0, x1, fg, bg)` | coords, colores | — | separador fino `─` |
 | `top_bar / status_bar(buf, izq, der, theme)` | textos | — | barras navy |
 | `vscrollbar(buf, col, total, top, visible, theme)` | `Rect` col, números | — | `▲ ░ █ ▼` proporcional |
-| `folder(buf, x, y, open, attr, accent)` | `bool` | `u16`=2 | `►■`/`▼■` |
+| `folder(buf, x, y, open, attr, accent, glyphs)` | `FolderGlyphs::{nerd, ascii}` | `u16`=1 | U+F07B/U+F07C o ASCII |
 | `drive(buf, x, y, letra, attr, accent)` | `char` | `u16`=4 | `[C:]` |
 | `win_close / win_min(buf, x, y, ...)` | — | `u16`=3 | `[■]` / `[-]` de título |
 
@@ -48,10 +50,11 @@ colores siempre vía `Theme` (nunca literales), todo dibuja sobre
 | `table_draw(buf, rect, def, state, footer, theme)` | `TableDef{headers, rows}` | `table_key(state, n, visible, code)`; `TableState{row, top}` |
 | `checkbox_draw(buf, x, y, item, focused, style)` | `CheckItem{label, checked}` | `check_key` → `Move/Toggled`; Espacio/letra alterna |
 | `radio_draw(buf, x, y, label, sel, focus, style)` | — | `radio_key` → `Select`; flechas eligen directo |
-| `CheckStyle::new(HotAttrs{base, hot}, GlyphSet::{modern, ascii})` | colores + glifos | `○ ●` / `☐ ☑` o ASCII |
+| `CheckStyle::new(HotAttrs{base, hot}, GlyphSet::{modern, ascii})` | colores + glifos | `[✓]` U+2713 / `(•)` U+2022 o ASCII |
 | `fkey_bar(buf, y, keys, theme)` | `&[(&str,&str)]` | 1 fila clásica |
 | `fkey_bar_styled(buf, y, keys, FKeyStyle)` | `FKeyStyle{key_fg/bg, label_fg/bg}` | a) cantidad b) etiquetas d/e) colores |
 | `fkey_bar_stacked(buf, y, keys, style)` | 2 filas | F sobre el número, alineados |
+| `fkey_bar_compact(buf, y, keys, style)` | 1 fila | `¹Help ²Qview ¹⁰Menu` (superíndices) |
 | `popup_size(items)` | — | `(w, h)` para layout manual |
 
 ## app — shell (`tui90::app`)
