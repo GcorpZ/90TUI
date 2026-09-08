@@ -173,6 +173,7 @@ pub fn button_draw_opts(
         cx = cx.saturating_add(1);
     }
     // Borde opt-in: marco de 1 celda alrededor (no cambia el ancho devuelto).
+    let has_border = opts.border_color.is_some();
     if let Some(border) = opts.border_color {
         let battr = Attr::new(border, border);
         for i in 0..w.saturating_add(2) {
@@ -192,23 +193,29 @@ pub fn button_draw_opts(
         buf.set(bx.saturating_sub(1), by, Cell::with_attr(' ', battr));
         buf.set(bx.saturating_add(w), by, Cell::with_attr(' ', battr));
     }
+    // CÁLCULO QUIRÚRGICO DE LA SOMBRA (Ajustado según la presencia de bordes)
     if !pressed && opts.has_shadow {
-        // Sombra CUA exacta (spec §3), sin filas/celdas extra:
-        // botón en fila `by`, de `x_start = bx` a `x_end = bx + w` (`H = 1`).
-        // 1. El cuerpo ya se dibujó arriba de forma normal.
-        // 2. Lateral derecha: EXACTAMENTE `(x_end, y)`.
-        // 3. Inferior: `(x_start + 1)..=(x_end)` en `y + 1` (inclusivo:
-        //    incluye la esquina que cierra la L).
-        // Cada celda mezcla: conserva el carácter de fondo y solo fuerza
-        // `bg` a negro + `dim` (equivale al `buffer[y*w+x]` del spec con
-        // chequeo de bordes en vez de `idx < buffer.len()`).
-        let x_start = bx;
-        let x_end = bx.saturating_add(w);
-        blend_shadow(buf, x_end, by, theme);
+        // Si hay borde, la sombra debe desplazarse 1 celda más hacia afuera
+        let border_offset = if has_border { 1 } else { 0 };
+
+        let x_start = bx.saturating_sub(border_offset);
+        let x_end = bx.saturating_add(w).saturating_add(border_offset);
+        let shadow_y = by.saturating_add(1).saturating_add(border_offset);
+
+        // 1. Sombra lateral derecha (Cubre el alto del botón incluyendo su borde si tiene)
+        let shadow_x_right = x_end;
+        blend_shadow(buf, shadow_x_right, by, theme);
+        if has_border {
+            blend_shadow(buf, shadow_x_right, by.saturating_sub(1), theme);
+            blend_shadow(buf, shadow_x_right, by.saturating_add(1), theme);
+        }
+
+        // 2. Sombra inferior (Desplazada una celda a la derecha del inicio real)
         for sx in x_start.saturating_add(1)..=x_end {
-            blend_shadow(buf, sx, by.saturating_add(1), theme);
+            blend_shadow(buf, sx, shadow_y, theme);
         }
     }
+
     w
 }
 
@@ -330,6 +337,30 @@ mod tests {
         assert_eq!(b.get(2, 1).unwrap().fg, Color::Yellow);
         assert_eq!(b.get(3, 2).unwrap().bg, t.desktop); // sin sombra
         assert_eq!(b.get(12, 1).unwrap().bg, t.desktop);
+    }
+
+    #[test]
+    fn border_pushes_shadow_outward() {
+        use crate::core::Color;
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(30, 8, t.desktop);
+        let opts = ButtonOpts {
+            border_color: Some(Color::Red),
+            ..ButtonOpts::default()
+        };
+        let w = button_ex(&mut b, 4, 2, "OK", t, opts);
+        // Borde inferior intacto (la sombra ya NO lo pisa).
+        for x in 3..4 + w + 1 {
+            assert_eq!(b.get(x, 3).unwrap().bg, Color::Red, "borde en ({x}, 3)");
+        }
+        // Sombra desplazada a by+2 con el mismo principio de mezcla.
+        for x in 4..=4 + w + 1 {
+            assert_eq!(b.get(x, 4).unwrap().bg, t.shadow, "sombra en ({x}, 4)");
+        }
+        // Lateral derecha cubre el alto con borde (by-1, by, by+1).
+        assert_eq!(b.get(4 + w + 1, 1).unwrap().bg, t.shadow);
+        assert_eq!(b.get(4 + w + 1, 2).unwrap().bg, t.shadow);
+        assert_eq!(b.get(4 + w + 1, 3).unwrap().bg, t.shadow);
     }
 
     #[test]
