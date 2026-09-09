@@ -28,8 +28,8 @@ pub use prim::{
     button, button_draw, button_draw_ex, button_draw_opts, button_ex, button_width, darken_color,
     draw_hot_label, draw_text, drive, fit_text, folder, hot_key_of, hsep, parse_hotkey, shadow,
     shadow_offset, shadow_solid, shadow_stipple, shadow_styled, status_bar, top_bar, visible_len,
-    vscrollbar, win_close, win_min, window, ButtonOpts, FolderGlyphs, HotAttrs, ShadowStyle,
-    WindowOpts, BUTTON_MIN_WIDTH,
+    vscrollbar, win_close, win_min, window, BorderStyle, ButtonOpts, FolderGlyphs, HotAttrs,
+    ShadowStyle, WindowOpts, BUTTON_MIN_WIDTH,
 };
 pub use widgets::{
     apply_datemask, bar_fill_width, bar_heights, calendar_draw, calendar_field_width, calendar_key,

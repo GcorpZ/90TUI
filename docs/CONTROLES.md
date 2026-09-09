@@ -22,8 +22,8 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 
 | Función | Parámetros | Devuelve | Efecto |
 |---|---|---|---|
-| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | bloque + título centrado + sombra mezclada + caja `[■]` (`\u{25a0}`) incrustada en `x+1,x+2,x+3` opt |
-| `WindowOpts::modal/form/dialog(título, theme)` | `&str`, `Theme` | `WindowOpts` | presets gris/negro/menta (`.controls`, `.shadow_style`, `.border_color` opt, `.shadow`=`has_shadow`) |
+| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | marco `BorderStyle::{None, Single, Double, Bevel3D}` (presets con `Double`) + título centrado incrustado + sombra cromática + caja `[■]` (`\u{25a0}`) en `x+1,x+2,x+3` opt |
+| `WindowOpts::modal/form/dialog(título, theme)` | `&str`, `Theme` | `WindowOpts` | presets gris/negro/menta con `Double` (`.controls`, `.shadow_style`, `.border_color` tiñe glifos, `.shadow`=`has_shadow`) |
 | `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra cromática (offset 2,1): conserva glifo, oscurece fg/bg con `darken_color` + `dim` ANSI |
 | `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes (botones = sólida) |
 | `Cell.dim` / `Attr::faint` | flag | — | `\x1b[2m` real en el backend |

@@ -26,4 +26,4 @@ pub use shadow::{
     darken_color, shadow, shadow_offset, shadow_solid, shadow_stipple, shadow_styled, ShadowStyle,
 };
 pub use title::{status_bar, top_bar};
-pub use window::{window, WindowOpts};
+pub use window::{window, BorderStyle, WindowOpts};

@@ -1,12 +1,59 @@
-//! Ventanas planas: bloque sólido + barra de título + sombra dura.
+//! Ventanas era DOS: bloque + barra de título + sombra + marcos CP437.
 //!
-//! Sin box-drawing. El título va centrado en la primera fila con su
-//! propio fondo (teal en modales, menta en diálogos, negro en fichas).
+//! `BorderStyle::None` es el bloque plano clásico (título en barra propia,
+//! sin box-drawing). `Single`/`Double` visten el perímetro con caja CP437
+//! (título incrustado en el marco superior) y `Bevel3D` le da bisel
+//! mecánico estilo PC Tools (aristas claras/arriba-izquierda, oscuras
+//! abajo-derecha). La geometría no cambia: el cuerpo siempre empieza en
+//! `rect.y + 1`.
 
-use crate::core::{Buffer, Cell, Color, Rect, Theme};
+use crate::core::{Attr, Buffer, Cell, Color, Rect, Theme};
 
 use super::label::{draw_text, fit_text, visible_len};
 use super::shadow::{shadow_styled, ShadowStyle};
+
+/// Estilo de borde de ventana (era DOS).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum BorderStyle {
+    /// Bloque plano clásico: título en barra propia, sin marcos.
+    #[default]
+    None,
+    /// Caja simple CP437 (`┌─┐│└┘`).
+    Single,
+    /// Caja doble Norton/Clipper (`╔═╗║╚╝`).
+    Double,
+    /// Bisel mecánico PC Tools: arriba/izquierda brillante,
+    /// abajo/derecha oscuro (ignora `border_color`).
+    Bevel3D,
+}
+
+/// Glifos de una caja perimetral.
+struct FrameGlyphs {
+    tl: char,
+    tr: char,
+    bl: char,
+    br: char,
+    h: char,
+    v: char,
+}
+
+const SINGLE: FrameGlyphs = FrameGlyphs {
+    tl: '\u{250c}',
+    tr: '\u{2510}',
+    bl: '\u{2514}',
+    br: '\u{2518}',
+    h: '\u{2500}',
+    v: '\u{2502}',
+};
+
+const DOUBLE: FrameGlyphs = FrameGlyphs {
+    tl: '\u{2554}',
+    tr: '\u{2557}',
+    bl: '\u{255a}',
+    br: '\u{255d}',
+    h: '\u{2550}',
+    v: '\u{2551}',
+};
 
 /// Opciones de dibujo de una ventana (incluye los 4 parámetros globales:
 /// cuerpo = fg/bg, `border_color` opt-in, `shadow` = `has_shadow`).
@@ -23,9 +70,12 @@ pub struct WindowOpts {
     /// `has_shadow`: si `false`, no proyecta sombra.
     pub shadow: bool,
     pub shadow_style: ShadowStyle,
-    /// `border_color` global: `Some` pinta marco de 1 celda en el borde
-    /// del rect; `None` = bloque sin marco (look Clipper por defecto).
+    /// `border_color` global: con `BorderStyle::None` pinta el marco de
+    /// 1 celda macizo del borde; con `Single`/`Double` tiñe los glifos
+    /// del marco (`None` = tinta del cuerpo). `Bevel3D` lo ignora.
     pub border_color: Option<Color>,
+    /// Estilo de marco perimetral (los presets usan `Double`).
+    pub border_style: BorderStyle,
     /// Pinta caja de cierre `[■]` (`\u{25a0}`) incrustada en el borde
     /// superior: ocupa `x+1, x+2, x+3` relativos a la esquina.
     pub controls: bool,
@@ -54,6 +104,7 @@ impl WindowOpts {
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
             border_color: None,
+            border_style: BorderStyle::Double,
             controls: false,
         }
     }
@@ -70,6 +121,7 @@ impl WindowOpts {
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
             border_color: None,
+            border_style: BorderStyle::Double,
             controls: false,
         }
     }
@@ -86,6 +138,7 @@ impl WindowOpts {
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
             border_color: None,
+            border_style: BorderStyle::Double,
             controls: false,
         }
     }
@@ -100,26 +153,33 @@ pub fn window(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, theme: Theme) {
     if opts.shadow {
         shadow_styled(buf, rect, 2, 1, opts.shadow_style, theme);
     }
+    match opts.border_style {
+        BorderStyle::None => draw_flat(buf, rect, opts),
+        BorderStyle::Single => draw_framed(buf, rect, opts, &SINGLE),
+        BorderStyle::Double => draw_framed(buf, rect, opts, &DOUBLE),
+        BorderStyle::Bevel3D => draw_framed(buf, rect, opts, &SINGLE),
+    }
+}
+
+/// Ventana plana clásica: bloque + barra de título + marco macizo opt-in.
+fn draw_flat(buf: &mut Buffer, rect: Rect, opts: &WindowOpts) {
     buf.fill_rect(rect, Cell::new(' ', opts.body_fg, opts.body_bg));
     // Barra de título: primera fila.
     if rect.h >= 1 {
         let bar = Rect::new(rect.x, rect.y, rect.w, 1);
         buf.fill_rect(bar, Cell::new(' ', opts.title_fg, opts.title_bg));
-        let fit = fit_text(&opts.title, rect.w.saturating_sub(2));
-        let tw = visible_len(&fit);
-        let tx = rect.x.saturating_add(rect.w.saturating_sub(tw) / 2);
-        let attr = crate::core::Attr {
-            fg: opts.title_fg,
-            bg: opts.title_bg,
-            bold: opts.title_bold,
-            dim: false,
-        };
-        draw_text(buf, tx, rect.y, &fit, attr);
+        draw_title_text(buf, rect, rect.w, opts);
         // Caja de cierre `[■]` (`\u{25a0}`) incrustada en el borde superior:
         // NO es un widget flotante; reemplaza los 3 primeros caracteres de
         // la línea horizontal en `x+1, x+2, x+3` (relativo a la esquina).
         if opts.controls && rect.w >= 8 {
-            super::icons::win_close(buf, rect.x.saturating_add(1), rect.y, attr, Color::Yellow);
+            super::icons::win_close(
+                buf,
+                rect.x.saturating_add(1),
+                rect.y,
+                title_attr(opts),
+                Color::Yellow,
+            );
         }
     }
     // Borde opt-in: marco de 1 celda en el perímetro (no cambia el tamaño).
@@ -136,6 +196,100 @@ pub fn window(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, theme: Theme) {
     }
 }
 
+/// Ventana con marco CP437: el cuerpo se rellena primero y el marco se
+/// pinta encima (nunca lo pisa). El título va incrustado y centrado en la
+/// fila superior sin romper el recuadro; los controles reemplazan marco
+/// desde `x+1` sin desplazar la esquina.
+fn draw_framed(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, g: &FrameGlyphs) {
+    buf.fill_rect(rect, Cell::new(' ', opts.body_fg, opts.body_bg));
+    // Tinta del marco: `border_color`, del cuerpo si no hay, o bisel
+    // mecánico (arriba/izquierda brillante, abajo/derecha oscuro).
+    let (bright, dark) = match opts.border_style {
+        BorderStyle::Bevel3D => (Color::White, Color::DarkGrey),
+        _ => {
+            let ink = opts.border_color.unwrap_or(opts.body_fg);
+            (ink, ink)
+        }
+    };
+    let right = rect.right().saturating_sub(1);
+    let bottom = rect.bottom().saturating_sub(1);
+    // Horizontales (arriba sobre `title_bg`, abajo sobre `body_bg`).
+    for x in rect.x.saturating_add(1)..rect.right().saturating_sub(1) {
+        buf.set(
+            x,
+            rect.y,
+            Cell::with_attr(g.h, Attr::new(bright, opts.title_bg)),
+        );
+        buf.set(
+            x,
+            bottom,
+            Cell::with_attr(g.h, Attr::new(dark, opts.body_bg)),
+        );
+    }
+    // Verticales (siempre sobre el cuerpo).
+    for y in rect.y.saturating_add(1)..rect.bottom().saturating_sub(1) {
+        buf.set(
+            rect.x,
+            y,
+            Cell::with_attr(g.v, Attr::new(bright, opts.body_bg)),
+        );
+        buf.set(
+            right,
+            y,
+            Cell::with_attr(g.v, Attr::new(dark, opts.body_bg)),
+        );
+    }
+    // Esquinas (arriba con la barra, abajo con el cuerpo).
+    buf.set(
+        rect.x,
+        rect.y,
+        Cell::with_attr(g.tl, Attr::new(bright, opts.title_bg)),
+    );
+    buf.set(
+        right,
+        rect.y,
+        Cell::with_attr(g.tr, Attr::new(bright, opts.title_bg)),
+    );
+    buf.set(
+        rect.x,
+        bottom,
+        Cell::with_attr(g.bl, Attr::new(dark, opts.body_bg)),
+    );
+    buf.set(
+        right,
+        bottom,
+        Cell::with_attr(g.br, Attr::new(dark, opts.body_bg)),
+    );
+    // Título centrado entre esquinas + cierre en `x+1..x+3`.
+    draw_title_text(buf, rect, rect.w.saturating_sub(2), opts);
+    if opts.controls && rect.w >= 8 {
+        super::icons::win_close(
+            buf,
+            rect.x.saturating_add(1),
+            rect.y,
+            title_attr(opts),
+            Color::Yellow,
+        );
+    }
+}
+
+/// Título centrado en la fila superior (`title_fg`/`title_bg`).
+fn draw_title_text(buf: &mut Buffer, rect: Rect, width: u16, opts: &WindowOpts) {
+    let fit = fit_text(&opts.title, width);
+    let tw = visible_len(&fit);
+    let tx = rect.x.saturating_add(rect.w.saturating_sub(tw) / 2);
+    draw_text(buf, tx, rect.y, &fit, title_attr(opts));
+}
+
+/// Atributo de la barra de título.
+fn title_attr(opts: &WindowOpts) -> Attr {
+    if opts.title_bold {
+        Attr::bold(opts.title_fg, opts.title_bg)
+    } else {
+        Attr::new(opts.title_fg, opts.title_bg)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,7 +301,13 @@ mod tests {
         let mut b = Buffer::blank(40, 15, t.desktop);
         let r = Rect::new(5, 3, 30, 9);
         window(&mut b, r, &WindowOpts::modal("ORDENAR", t), t);
-        // Título centrado, fondo teal.
+        // Modal = caja doble: esquinas CP437 (arriba sobre teal).
+        assert_eq!(b.get(5, 3).unwrap().ch, '\u{2554}'); // ╔
+        assert_eq!(b.get(5 + 30 - 1, 3).unwrap().ch, '\u{2557}'); // ╗
+        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().ch, '\u{255a}'); // ╚
+        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().ch, '\u{255d}'); // ╝
+        assert_eq!(b.get(5, 3).unwrap().bg, t.teal);
+        // Título centrado e incrustado en el marco (misma x que en plano).
         assert_eq!(b.get(5 + (30 - 7) / 2, 3).unwrap().ch, 'O');
         assert_eq!(b.get(6, 3).unwrap().bg, t.teal);
         // Cuerpo gris.
@@ -188,14 +348,57 @@ mod tests {
         assert_eq!(b.get(7, 3).unwrap().ch, '\u{25a0}');
         assert_eq!(b.get(7, 3).unwrap().fg, Color::Yellow);
         assert_eq!(b.get(8, 3).unwrap().ch, ']');
-        // Borde opt-in: perímetro en el color pedido.
+        // Borde opt-in tiñe los glifos del marco (fondo sigue del cuerpo).
         let mut bordered = WindowOpts::modal("B", t);
         bordered.border_color = Some(Color::Red);
         window(&mut b, r, &bordered, t);
-        assert_eq!(b.get(5, 3).unwrap().bg, Color::Red);
-        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().bg, Color::Red);
-        // Sin borde por defecto: la esquina es del cuerpo.
+        assert_eq!(b.get(5, 3).unwrap().ch, '\u{2554}');
+        assert_eq!(b.get(5, 3).unwrap().fg, Color::Red);
+        assert_eq!(b.get(5, 3).unwrap().bg, t.teal);
+        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().fg, Color::Red);
+        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().bg, Color::Grey);
+        // Sin borde por defecto: la esquina es glifo doble sobre el cuerpo.
         window(&mut b, r, &WindowOpts::modal("B", t), t);
+        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().ch, '\u{255a}');
         assert_eq!(b.get(5, 3 + 9 - 1).unwrap().bg, Color::Grey);
+    }
+
+    #[test]
+    fn single_bevel_and_none_styles() {
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(40, 15, t.desktop);
+        let r = Rect::new(5, 3, 30, 9);
+        // Single: esquinas finas, título incrustado.
+        let mut single = WindowOpts::modal("S", t);
+        single.border_style = BorderStyle::Single;
+        window(&mut b, r, &single, t);
+        assert_eq!(b.get(5, 3).unwrap().ch, '\u{250c}'); // ┌
+        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().ch, '\u{2518}'); // ┘
+        assert_eq!(b.get(6, 3).unwrap().ch, '\u{2500}'); // ─
+        assert_eq!(b.get(5, 4).unwrap().ch, '\u{2502}'); // │
+                                                         // Bevel3D: arriba/izquierda brillante, abajo/derecha oscuro.
+        let mut bevel = WindowOpts::modal("V", t);
+        bevel.border_style = BorderStyle::Bevel3D;
+        window(&mut b, r, &bevel, t);
+        assert_eq!(b.get(5, 3).unwrap().fg, Color::White);
+        assert_eq!(b.get(5, 4).unwrap().fg, Color::White);
+        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().fg, Color::DarkGrey);
+        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().fg, Color::DarkGrey);
+        // None: bloque plano clásico, esquina del cuerpo.
+        let mut flat = WindowOpts::modal("F", t);
+        flat.border_style = BorderStyle::None;
+        window(&mut b, r, &flat, t);
+        assert_eq!(b.get(5, 3).unwrap().ch, ' ');
+        assert_eq!(b.get(5, 3).unwrap().bg, t.teal);
+        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().bg, Color::Grey);
+    }
+
+    #[test]
+    fn presets_default_to_double() {
+        let t = Theme::clipper();
+        assert_eq!(WindowOpts::modal("M", t).border_style, BorderStyle::Double);
+        assert_eq!(WindowOpts::form("F", t).border_style, BorderStyle::Double);
+        assert_eq!(WindowOpts::dialog("D", t).border_style, BorderStyle::Double);
+        assert_eq!(BorderStyle::default(), BorderStyle::None);
     }
 }
