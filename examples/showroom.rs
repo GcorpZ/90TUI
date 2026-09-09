@@ -22,21 +22,22 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
+use g90tui::prim::icons20::{win_resize_grip, win_zoom};
 use g90tui::{
     button_draw, button_width, calendar_draw, calendar_field_width, calendar_key_mod, check_key,
-    draw_text, drive_badge, dropdown_draw, dropdown_key, enter_screen, filedialog_draw,
-    filedialog_key, fkey_bar_compact, folder_badge, grid_draw, input_draw, input_key, leave_screen,
+    draw_text, drive_badge, dropdown_draw, dropdown_key, enter_screen, file_badge, filedialog_draw,
+    filedialog_key, fkey_badge, folder_badge, grid_draw, input_draw, input_key, leave_screen,
     list_key, listbox_draw, listbox_key, menubar_draw, msgbox_draw, msgbox_key, progressbar_draw,
     radio_key, statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar, tuichart_draw,
     vscrollbar, window, Alignment, Attr, Backend, Buffer, Buttons, CalNav, CalendarPicker, Cell,
     ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend, DriveType,
-    Dropdown, DropdownKey, EventCtx, FKeyDef, FKeyStyle, FileDialog, FileDialogKey, FocusManager,
-    GlyphSet, GridTable, HandleEvent, HotAttrs, IconMode, InputField, InputKey, ListBox, MenuDef,
-    MsgBoxKey, RadioNav, Rect, Screen, StatusBar, TabControl, TabPosition, TableDef, TableState,
-    Theme, TuiChart, WindowOpts,
+    Dropdown, DropdownKey, EventCtx, FKeyDef, FileDialog, FileDialogKey, FocusManager, GlyphSet,
+    GridTable, HandleEvent, HotAttrs, IconMode, InputField, InputKey, ListBox, MenuDef, MsgBoxKey,
+    RadioNav, Rect, Screen, StatusBar, TabControl, TabPosition, TableDef, TableState, Theme,
+    TuiChart, WindowOpts,
 };
 
-/// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder()`.
+/// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder_badge()`.
 const TREE: [(&str, &str, bool); 14] = [
     ("", "C:", true),
     ("├─ ", "cfg", false),
@@ -432,11 +433,6 @@ impl Show {
         let active_menu = 3usize;
         let tree_vis = lay.tree_panel.h.saturating_sub(2).max(1) as usize;
         let files_vis = lay.file_panel.h.saturating_sub(3).max(1) as usize;
-        let fkey_refs: Vec<(&str, &str)> = self
-            .fkeys
-            .iter()
-            .map(|f| (f.key.as_str(), f.label.as_str()))
-            .collect();
 
         let buf: &mut Buffer = self.screen.frame();
         buf.fill_rect(bounds, Cell::blank(Color::DarkGrey));
@@ -534,6 +530,39 @@ impl Show {
                 "56 Listed = 3,482,374 Bytes",
                 t,
             );
+            // Iconos icons20 por extensión sobre la columna Nombre: el badge
+            // ocupa la 1ª celda y el nombre se recorre 1 a la derecha con su
+            // fondo original (selección o cuerpo), sin romper la tabla.
+            for i in 0..files_vis {
+                let Some(row) = self.files.rows.get(files_state.top + i) else {
+                    break;
+                };
+                let y = area.y + 1 + i as u16;
+                let full = format!(
+                    "{}.{}",
+                    row.first().map(String::as_str).unwrap_or(""),
+                    row.get(1).map(String::as_str).unwrap_or("")
+                );
+                // Fondo de la fila (selección o cuerpo) para el badge.
+                let row_bg = buf.get(area.x, y).map(|c| c.bg).unwrap_or(t.window_bg);
+                file_badge(buf, area.x, y, &full, IconMode::NerdFont, t);
+                if let Some(ic) = buf.get(area.x, y) {
+                    buf.set(area.x, y, Cell::new(ic.ch, ic.fg, row_bg));
+                }
+                let selected = files_state.top + i == files_state.row;
+                let fg = if selected {
+                    t.popup_sel_attr().fg
+                } else {
+                    t.form_attr().fg
+                };
+                if let Some(name) = row.first() {
+                    for (k, ch) in name.chars().take(11).enumerate() {
+                        let x = area.x.saturating_add(1).saturating_add(k as u16);
+                        let bg = buf.get(x, y).map(|c| c.bg).unwrap_or(t.window_bg);
+                        buf.set(x, y, Cell::new(ch, fg, bg));
+                    }
+                }
+            }
             vscrollbar(
                 buf,
                 Rect::new(p.x + p.w - 2, p.y + 1, 1, p.h.saturating_sub(2)),
@@ -554,10 +583,22 @@ impl Show {
         }
 
         // Dos filas fijas al final, sin duplicados:
-        // h-2 = StatusBar por columnas, h-1 = teclas de función.
+        // h-2 = StatusBar por columnas, h-1 = badges de función icons20.
         if bounds.h >= 3 {
-            let fstyle = FKeyStyle::highlight(Color::Yellow, Color::White, Color::DarkGrey);
-            fkey_bar_compact(buf, bounds.h - 1, &fkey_refs, fstyle);
+            let fy = bounds.h - 1;
+            buf.fill_rect(
+                Rect::new(0, fy, bounds.w, 1),
+                Cell::new(' ', Color::White, t.navy),
+            );
+            let mut fx = 1u16;
+            for f in &self.fkeys {
+                let num: u8 = f.key.trim_start_matches('F').parse().unwrap_or(0);
+                fx = fx.saturating_add(fkey_badge(buf, fx, fy, num, &f.label, t));
+                fx = fx.saturating_add(1);
+                if fx >= bounds.w {
+                    break;
+                }
+            }
             statusbar_draw(buf, bounds.h - 2, &status);
         }
 
@@ -570,6 +611,22 @@ impl Show {
             let mut wo = WindowOpts::dialog("Showroom G90TUI", t);
             wo.controls = true;
             window(buf, d, &wo, t);
+            // Cabecera completa icons20: zoom arriba-dcha + grip abajo-dcha
+            // (el cierre `[■]` ya lo pinta `window()` en x+1).
+            let title_a = Attr::bold(Color::White, t.teal);
+            win_zoom(
+                buf,
+                d.right().saturating_sub(4),
+                d.y,
+                title_a,
+                Color::Yellow,
+            );
+            win_resize_grip(
+                buf,
+                d.right().saturating_sub(1),
+                d.bottom().saturating_sub(1),
+                Attr::new(Color::DarkGrey, t.dialog),
+            );
             let base = t.dialog_attr();
             let hot = Attr::bold(Color::Red, t.dialog);
             let cstyle = CheckStyle::new(HotAttrs { base, hot }, GlyphSet::modern());
