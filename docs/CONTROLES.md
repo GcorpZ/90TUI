@@ -73,8 +73,9 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `textarea_draw(buf, rect, area, focused)` | `TextArea{lines, cursor, max_chars, fg/bg/active_bg, border_color, has_shadow}` | `textarea_key` → Enter parte línea, flechas/PgUp/PgDn navegan, scroll vertical |
 | `hyperlink_draw(buf, x, y, link)` | `Hyperlink{text, url}` | texto negrita coloreado; `osc8_sequence()` = `\x1b]8;;URL\x1b\\TEXTO\x1b]8;;\x1b\\` clickeable |
 | `tuichart_draw(buf, rect, chart)` | `TuiChart{kind: Bars3D/Line/Pie, series: [(label, value)]}` | barras `█`+`▒` 3D · líneas braille `⠃⠇⠽` · tarta sectorial + leyenda `%` |
-| `tab_draw(buf, rect, tabs)` | `TabControl{tabs:[{label, fg, bg}], active, position: Top/Left}` | `tab_viewport(rect)` = área útil de página; `tab_key` (`←→`/`↑↓` circular, `t` rota en demo) |
-| `grid_draw(buf, rect, grid)` | `GridTable{headers, rows, widths (0=auto)}` | anchos auto/fijos, fila resaltada, scroll vertical; `grid_key` (flechas/PgUp/PgDn) |
+| `tab_draw(buf, rect, tabs)` | `TabControl{tabs:[{label, fg, bg}], active, position: Top/Left}` | `tab_viewport(rect)` = área útil de página; `tab_key` (`←→`/`↑↓` circular); `active_scope()` nombra el ámbito de foco |
+| `grid_draw(buf, rect, grid)` | `GridTable{headers, rows, widths (0=auto)}` | anchos auto/fijos, fila resaltada, scroll vertical; `handle_event(EventCtx, key)` nativo (↑↓/PgUp/PgDn) |
+| `FocusManager::{add_scope, set_active, cycle_next, is_focusable}` | ámbitos por página (nombres = etiquetas de tab) | `Tab` global solo circula el ámbito activo; páginas ocultas fuera del teclado |
 | `msgbox_draw(buf, screen, título, msg, buttons, sel, theme)` | `Buttons::{Ok, OkCancel, YesNo}` | modal centrado + wrap + botones 1 fila con `▀`; `msgbox_key` → `Accept(i)`/`Cancel` |
 | `calendar_draw(buf, rect, cal)` | `CalendarPicker::new/current()` (matemática civil propia) | cuadrícula 7 col L–D, selección invertida; `calendar_key` (flechas/PgUp/PgDn/`Enter`) |
 | `popup_size(items)` | — | `(w, h)` para layout manual |

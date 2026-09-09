@@ -11,6 +11,7 @@ pub mod checkradio;
 pub mod dialog;
 pub mod dropdown;
 pub mod filedialog;
+pub mod focus;
 pub mod form;
 pub mod grid;
 pub mod hyperlink;
@@ -46,6 +47,7 @@ pub use dropdown::{
 pub use filedialog::{
     filedialog_draw, filedialog_key, filedialog_layout, FileDialog, FileDialogKey,
 };
+pub use focus::{EventCtx, FocusManager, HandleEvent};
 pub use form::{form_draw, form_key, Field, FieldKind, FormKey, FormState};
 pub use grid::{grid_column_widths, grid_draw, grid_key, grid_visible, GridNav, GridTable};
 pub use hyperlink::{hyperlink_draw, Hyperlink};

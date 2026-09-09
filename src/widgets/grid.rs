@@ -218,6 +218,15 @@ pub enum GridNav {
     Move(usize),
 }
 
+impl super::focus::HandleEvent for GridTable {
+    type Out = GridNav;
+    /// `↑↓` (y `PgUp/PgDn/Home/End`) alteran `selected` con scroll y el
+    /// llamante redibuja para resaltar la fila al instante.
+    fn handle_event(&mut self, ctx: &super::focus::EventCtx, code: KeyCode) -> GridNav {
+        grid_key(self, ctx.visible, code)
+    }
+}
+
 pub fn grid_key(grid: &mut GridTable, visible: usize, code: KeyCode) -> GridNav {
     use GridNav::*;
     let n = grid.rows.len();

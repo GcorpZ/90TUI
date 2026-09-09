@@ -21,15 +21,15 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 use tui90::{
     button_draw, button_width, check_key, draw_text, drive, dropdown_draw, dropdown_key,
-    enter_screen, filedialog_draw, filedialog_key, fkey_bar_compact, folder, grid_draw, grid_key,
-    input_draw, input_key, leave_screen, list_key, listbox_draw, listbox_key, menubar_draw,
-    msgbox_draw, msgbox_key, progressbar_draw, radio_key, statusbar_draw, tab_draw, tab_key,
-    table_draw, table_key, top_bar, tuichart_draw, vscrollbar, window, Alignment, Attr, Backend,
-    Buffer, Buttons, Cell, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color,
-    CrosstermBackend, Dropdown, DropdownKey, FKeyDef, FKeyStyle, FileDialog, FileDialogKey,
-    FolderGlyphs, GlyphSet, GridTable, HotAttrs, InputField, InputKey, ListBox, MenuDef, MsgBoxKey,
-    RadioNav, Rect, Screen, StatusBar, TabControl, TabPosition, TableDef, TableState, Theme,
-    TuiChart, WindowOpts,
+    enter_screen, filedialog_draw, filedialog_key, fkey_bar_compact, folder, grid_draw, input_draw,
+    input_key, leave_screen, list_key, listbox_draw, listbox_key, menubar_draw, msgbox_draw,
+    msgbox_key, progressbar_draw, radio_key, statusbar_draw, tab_draw, tab_key, table_draw,
+    table_key, top_bar, tuichart_draw, vscrollbar, window, Alignment, Attr, Backend, Buffer,
+    Buttons, Cell, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend,
+    Dropdown, DropdownKey, EventCtx, FKeyDef, FKeyStyle, FileDialog, FileDialogKey, FocusManager,
+    FolderGlyphs, GlyphSet, GridTable, HandleEvent, HotAttrs, InputField, InputKey, ListBox,
+    MenuDef, MsgBoxKey, RadioNav, Rect, Screen, StatusBar, TabControl, TabPosition, TableDef,
+    TableState, Theme, TuiChart, WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder()`.
@@ -99,6 +99,8 @@ struct Show {
     /// Pestañas del diálogo central + inventario de la 2ª página.
     tabs: TabControl,
     grid: GridTable,
+    /// Ámbitos de foco declarados por página (el TabControl manda).
+    fm: FocusManager,
     /// `StatusBar` avanzada (columnas dinámicas del bucle principal).
     status: StatusBar,
     status_w: u16,
@@ -210,7 +212,7 @@ impl Show {
             vec!["unformt".into(), "exe".into(), "1375441".into()],
             vec!["wpatch".into(), "com".into(), "40654".into()],
         ];
-        Self {
+        let mut show = Self {
             screen: Screen::new(w, h, Theme::clipper()),
             menus: vec![
                 MenuDef::new("File", &[]),
@@ -355,7 +357,15 @@ impl Show {
                 FKeyDef::new("F9", "Select"),
                 FKeyDef::new("F10", "Menu"),
             ],
-        }
+            fm: FocusManager::new(),
+        };
+        // Declaración de ámbitos (nombres = etiquetas de pestaña):
+        // General ve todo; Inventario solo su grid + comunes.
+        show.fm
+            .add_scope("General", &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        show.fm.add_scope("Inventario", &[0, 1, 8, 9, 10, 11]);
+        show.fm.set_active("General");
+        show
     }
 
     /// Columnas de la StatusBar según el ancho (se recrean al redimensionar).
@@ -564,13 +574,10 @@ impl Show {
             // página 1 = Inventario). En modo Left el contenido se corre.
             let tab_box = Rect::new(d.x + 2, d.y + 1, d.w.saturating_sub(4), 14);
             let vp = tab_draw(buf, tab_box, &self.tabs);
-            let shift = if self.tabs.position == TabPosition::Left {
-                self.tabs.strip_width()
-            } else {
-                0
-            };
-            let lx = d.x + 3 + shift; // columna izquierda
-            let rx = d.x + 36 + shift; // columna derecha
+            // Orígenes derivados del viewport (el offset de la tira lo
+            // calcula la librería en `tab_viewport`, no el demo).
+            let lx = vp.x.saturating_add(1);
+            let rx = vp.x.saturating_add(vp.w / 2).saturating_add(1);
             let label_attr = Attr::new(Color::Black, t.dialog);
             let dd_rect = Rect::new(lx.saturating_add(8), d.y + 2, 20, 1);
             if focus == 11 {
@@ -654,7 +661,12 @@ impl Show {
                     );
                 }
                 draw_text(buf, rx, d.y + 1, "Archivos:", label_attr);
-                let lb_w = 25.min(d.right().saturating_sub(rx).saturating_sub(1).max(10));
+                let lb_w = 25.min(
+                    vp.x.saturating_add(vp.w)
+                        .saturating_sub(rx)
+                        .saturating_sub(1)
+                        .max(10),
+                );
                 let lb_rect = Rect::new(rx, d.y + 2, lb_w, 8);
                 listbox_draw(buf, lb_rect, &self.listbox);
                 if focus == 8 {
@@ -842,9 +854,13 @@ impl Show {
             return true;
         }
         let lay = layout(self.screen.bounds());
+        // Tab global: solo circula por el ámbito ACTIVO (el TabControl manda).
         if code == KeyCode::Tab {
-            self.focus = (self.focus + 1) % FOCUS_NAMES.len();
-            self.message = format!("Foco: panel {}.", FOCUS_NAMES[self.focus]);
+            self.fm.set_active(self.tabs.active_scope());
+            if let Some(n) = self.fm.cycle_next() {
+                self.focus = n;
+                self.message = format!("Foco: panel {}.", FOCUS_NAMES[self.focus]);
+            }
             return true;
         }
         // Dropdown abierto: captura todo (menos Tab/Esc ya tratados).
@@ -926,9 +942,10 @@ impl Show {
             },
             8 => {
                 if self.tabs.active == 1 {
-                    // Página Inventario: la lista mueve el GridTable.
+                    // Página Inventario: la lista mueve el GridTable vía su
+                    // `handle_event` nativo (↑↓ alteran selected + scroll).
                     let vis = 10usize;
-                    match grid_key(&mut self.grid, vis, code) {
+                    match self.grid.handle_event(&EventCtx::new(vis), code) {
                         tui90::GridNav::Move(i) => {
                             if let Some(row) = self.grid.rows.get(i) {
                                 self.message = format!("Ítem: {} {}.", row[0], row[1]);
@@ -981,6 +998,8 @@ impl Show {
                 _ => {}
             },
             // Pestañas del diálogo: flechas cambian de página, `t` rota Top/Left.
+            // Al cambiar de página se re-activa su ámbito: el foco salta
+            // solo a widgets visibles (nunca a la página oculta).
             11 => {
                 if matches!(code, KeyCode::Char('t' | 'T')) {
                     self.tabs.position = match self.tabs.position {
@@ -991,6 +1010,8 @@ impl Show {
                 } else {
                     match tab_key(&mut self.tabs, code) {
                         tui90::TabNav::Move(i) => {
+                            self.fm.set_active(self.tabs.active_scope());
+                            self.focus = self.fm.current().unwrap_or(self.focus);
                             self.message = format!("Página: {}.", self.tabs.tabs[i].label);
                         }
                         tui90::TabNav::Stay => {}

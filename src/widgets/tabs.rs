@@ -80,6 +80,15 @@ impl TabControl {
         }
     }
 
+    /// Etiqueta de la página activa: nombre del ámbito de foco
+    /// (`FocusManager::set_active`) por convención.
+    pub fn active_scope(&self) -> &str {
+        self.tabs
+            .get(self.active)
+            .map(|t| t.label.as_str())
+            .unwrap_or("")
+    }
+
     /// Ancho de la columna de pestañas en modo `Left`.
     pub fn strip_width(&self) -> u16 {
         self.tabs
