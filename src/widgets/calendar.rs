@@ -1,17 +1,22 @@
-//! Micro-diálogo de fechas (`CalendarPicker`).
+//! Selector de fecha (`CalendarPicker`): campo contraído + popup flotante.
 //!
-//! Cuadrícula clásica de 7 columnas (L M M J V S D) del mes, selección
-//! rápida con flechas. Matemática civil propia (Hinnant), sin dependencias:
-//! días julianos ↔ calendario + días bisiestos.
-//! Expone los 4 parámetros globales (`foreground_color`,
-//! `background_color`, `border_color`, `has_shadow`).
+//! * **Cerrado:** 1 fila con máscara ` [ DD/MM/AAAA ] [ <icono> ]`
+//!   (icono Nerd Font `\u{f073}`). `Enter`/`Espacio` abre el popup.
+//! * **Abierto:** overlay de 23×10 con caja CP437 de doble línea,
+//!   cabecera `«◄ MES AAAA ►»`, semana `Lu..Do` y cursor Clipper en el
+//!   día. Flechas mueven días, `PgUp`/`PgDn` meses,
+//!   `Shift`/`Ctrl`+`PgUp`/`PgDn` años, `Enter` acepta y cierra,
+//!   `Esc` restaura y cierra.
+//! * Matemática civil propia (Hinnant), sin dependencias: días julianos
+//!   ↔ calendario + bisiestos.
+//! * Expone los 4 parámetros globales (`foreground_color`,
+//!   `background_color`, `border_color`, `has_shadow`).
 
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 
-use crate::core::{Attr, Buffer, Cell, Color, Rect};
+use crate::core::{Attr, Buffer, Cell, Color, Rect, Theme};
 use crate::prim::{draw_text, fit_text, shadow, visible_len};
 
-const WEEKDAYS: [&str; 7] = ["L", "M", "M", "J", "V", "S", "D"];
 const MONTHS: [&str; 12] = [
     "Enero",
     "Febrero",
@@ -26,6 +31,29 @@ const MONTHS: [&str; 12] = [
     "Noviembre",
     "Diciembre",
 ];
+
+/// Icono del campo contraído (Nerd Font, calendario).
+const CAL_ICON: char = '\u{f073}';
+/// Ancho de la fila contraída: ` [ DD/MM/AAAA ] [ X ]`.
+const FIELD_W: u16 = 21;
+/// Tamaño fijo del popup: caja + cabecera + semana + 6 filas + caja.
+const POPUP_W: u16 = 23;
+const POPUP_H: u16 = 10;
+/// Cabecera de columnas (20 celdas, centrada en el interior de 21).
+const WEEK_HEAD: &str = "Lu Ma Mi Ju Vi Sa Do";
+
+/// Caja CP437 de doble línea.
+const BOX_TL: char = '\u{2554}'; // ╔
+const BOX_TR: char = '\u{2557}'; // ╗
+const BOX_BL: char = '\u{255a}'; // ╚
+const BOX_BR: char = '\u{255d}'; // ╝
+const BOX_H: char = '\u{2550}'; // ═
+const BOX_V: char = '\u{2551}'; // ║
+/// Navegación de la cabecera: `«`/`»` años rápidos, `◄`/`►` meses.
+const HDR_PREV_YEAR: char = '\u{ab}'; // «
+const HDR_PREV_MONTH: char = '\u{25c4}'; // ◄
+const HDR_NEXT_MONTH: char = '\u{25ba}'; // ►
+const HDR_NEXT_YEAR: char = '\u{bb}'; // »
 
 /// Días desde 1970-01-01 (puede ser negativo).
 pub fn days_from_civil(y: i32, m: u8, d: u8) -> i64 {
@@ -77,12 +105,13 @@ pub fn days_in_month(y: i32, m: u8) -> u8 {
     }
 }
 
-/// Micro-diálogo de fecha.
+/// Selector de fecha con popup.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CalendarPicker {
     pub year: i32,
     pub month: u8,
     pub day: u8,
+    pub is_open: bool,
     pub foreground_color: Color,
     pub background_color: Color,
     pub header_fg: Color,
@@ -90,6 +119,8 @@ pub struct CalendarPicker {
     pub selected_bg: Color,
     pub border_color: Option<Color>,
     pub has_shadow: bool,
+    /// Valor confirmado al abrir (para restaurar con `Esc`).
+    saved: (i32, u8, u8),
 }
 
 impl CalendarPicker {
@@ -98,6 +129,7 @@ impl CalendarPicker {
             year,
             month: month.clamp(1, 12),
             day: day.max(1),
+            is_open: false,
             foreground_color: Color::Black,
             background_color: Color::White,
             header_fg: Color::White,
@@ -105,8 +137,10 @@ impl CalendarPicker {
             selected_bg: Color::Navy,
             border_color: None,
             has_shadow: true,
+            saved: (year, month.clamp(1, 12), day.max(1)),
         };
         c.day = c.day.min(days_in_month(c.year, c.month));
+        c.saved = (c.year, c.month, c.day);
         c
     }
 
@@ -118,6 +152,28 @@ impl CalendarPicker {
             .unwrap_or(0) as i64;
         let (y, m, d) = civil_from_days(days);
         Self::new(y, m, d)
+    }
+
+    /// Fecha confirmada con formato de máscara `DD/MM/AAAA`.
+    pub fn formatted(&self) -> String {
+        format!("{:02}/{:02}/{:04}", self.day, self.month, self.year)
+    }
+
+    /// Abre el popup (guarda el valor para un posible `Esc`).
+    pub fn open(&mut self) {
+        self.saved = (self.year, self.month, self.day);
+        self.is_open = true;
+    }
+
+    /// Cierra aceptando la fecha visible.
+    pub fn accept(&mut self) {
+        self.is_open = false;
+    }
+
+    /// Cierra descartando (restaura lo que había al abrir).
+    pub fn cancel(&mut self) {
+        (self.year, self.month, self.day) = self.saved;
+        self.is_open = false;
     }
 
     fn add_days(&mut self, delta: i64) {
@@ -133,77 +189,136 @@ impl CalendarPicker {
         self.month = (total.rem_euclid(12) + 1) as u8;
         self.day = self.day.min(days_in_month(self.year, self.month));
     }
+
+    fn add_years(&mut self, delta: i32) {
+        self.add_months(delta.saturating_mul(12));
+    }
 }
 
-/// Origen (x0, y0) de la cuadrícula dentro de `rect` (título + cabecera).
-fn grid_origin(rect: Rect, bordered: bool) -> (u16, u16) {
-    (
-        rect.x.saturating_add(if bordered { 1 } else { 0 }),
-        rect.y
-            .saturating_add(2)
-            .saturating_add(if bordered { 1 } else { 0 }),
-    )
+/// Ancho de la fila contraída (1 fila de alto).
+pub fn calendar_field_width() -> u16 {
+    FIELD_W
 }
 
-/// Dibuja título + semana + días (seleccionado invertido).
+/// Rect del popup abierto: debajo del campo si cabe, si no encima.
+/// Siempre clampado a pantalla.
+pub fn calendar_popup_rect(closed: Rect, screen: Rect) -> Rect {
+    let below = closed.y.saturating_add(1);
+    let y = if below.saturating_add(POPUP_H) <= screen.bottom() {
+        below
+    } else {
+        closed.y.saturating_sub(POPUP_H)
+    };
+    Rect::new(closed.x, y, POPUP_W, POPUP_H).clamp_in(screen)
+}
+
+/// Dibuja el campo contraído y, si `is_open`, el popup encima.
+/// El llamante lo invoca al final (el overlay queda sobre todo).
 pub fn calendar_draw(buf: &mut Buffer, rect: Rect, cal: &CalendarPicker) {
-    if rect.w < 22 || rect.h < 9 {
+    if rect.is_empty() {
         return;
     }
-    let bordered = cal.border_color.is_some();
-    if cal.has_shadow {
-        shadow(buf, rect, crate::core::Theme::clipper());
-    }
+    let base = Attr::new(cal.foreground_color, cal.background_color);
     buf.fill_rect(
-        rect,
+        Rect::new(rect.x, rect.y, rect.w, 1),
         Cell::new(' ', cal.foreground_color, cal.background_color),
     );
-    let title = format!("{} {}", MONTHS[(cal.month - 1) as usize], cal.year);
-    draw_text(
-        buf,
-        rect.x
-            .saturating_add(rect.w.saturating_sub(visible_len(&title)) / 2),
-        rect.y.saturating_add(if bordered { 1 } else { 0 }),
-        &fit_text(&title, rect.w.saturating_sub(2)),
-        Attr::bold(cal.foreground_color, cal.background_color),
+    let line = format!(
+        " [ {:02}/{:02}/{:04} ] [ {} ]",
+        cal.day, cal.month, cal.year, CAL_ICON
     );
-    let (x0, y0) = grid_origin(rect, bordered);
-    for (i, wd) in WEEKDAYS.iter().enumerate() {
-        draw_text(
-            buf,
-            x0.saturating_add(1).saturating_add(i as u16 * 3),
-            y0,
-            wd,
-            Attr::bold(cal.header_fg, cal.background_color),
+    draw_text(buf, rect.x, rect.y, &fit_text(&line, rect.w), base);
+    if !cal.is_open {
+        return;
+    }
+    let pop = calendar_popup_rect(rect, buf.bounds());
+    if pop.w < POPUP_W || pop.h < POPUP_H {
+        return;
+    }
+    if cal.has_shadow {
+        shadow(buf, pop, Theme::clipper());
+    }
+    buf.fill_rect(
+        pop,
+        Cell::new(' ', cal.foreground_color, cal.background_color),
+    );
+    // Caja CP437 de doble línea.
+    let bc = Attr::new(
+        cal.border_color.unwrap_or(cal.foreground_color),
+        cal.background_color,
+    );
+    for x in pop.x.saturating_add(1)..pop.right().saturating_sub(1) {
+        buf.set(x, pop.y, Cell::with_attr(BOX_H, bc));
+        buf.set(
+            x,
+            pop.bottom().saturating_sub(1),
+            Cell::with_attr(BOX_H, bc),
         );
     }
+    for y in pop.y.saturating_add(1)..pop.bottom().saturating_sub(1) {
+        buf.set(pop.x, y, Cell::with_attr(BOX_V, bc));
+        buf.set(pop.right().saturating_sub(1), y, Cell::with_attr(BOX_V, bc));
+    }
+    buf.set(pop.x, pop.y, Cell::with_attr(BOX_TL, bc));
+    buf.set(
+        pop.right().saturating_sub(1),
+        pop.y,
+        Cell::with_attr(BOX_TR, bc),
+    );
+    buf.set(
+        pop.x,
+        pop.bottom().saturating_sub(1),
+        Cell::with_attr(BOX_BL, bc),
+    );
+    buf.set(
+        pop.right().saturating_sub(1),
+        pop.bottom().saturating_sub(1),
+        Cell::with_attr(BOX_BR, bc),
+    );
+    // Cabecera: `«◄ MES AAAA ►»` en mayúsculas, centrada y en negrita.
+    let inner = pop.w.saturating_sub(2);
+    let title = format!(
+        "{} {}",
+        MONTHS[(cal.month - 1) as usize].to_uppercase(),
+        cal.year
+    );
+    let head = format!("{HDR_PREV_YEAR}{HDR_PREV_MONTH} {title} {HDR_NEXT_MONTH}{HDR_NEXT_YEAR}");
+    let head = fit_text(&head, inner);
+    draw_text(
+        buf,
+        pop.x
+            .saturating_add(1)
+            .saturating_add(inner.saturating_sub(visible_len(&head)) / 2),
+        pop.y.saturating_add(1),
+        &head,
+        Attr::bold(cal.foreground_color, cal.background_color),
+    );
+    // Semana + días (celda de 3: cursor Clipper en el seleccionado).
+    let week = fit_text(WEEK_HEAD, inner);
+    draw_text(
+        buf,
+        pop.x
+            .saturating_add(1)
+            .saturating_add(inner.saturating_sub(visible_len(&week)) / 2),
+        pop.y.saturating_add(2),
+        &week,
+        Attr::bold(cal.header_fg, cal.background_color),
+    );
     let first = weekday(cal.year, cal.month, 1);
     let ndays = days_in_month(cal.year, cal.month);
     for day in 1..=ndays {
         let pos = first as usize + (day - 1) as usize;
         let (col, row) = (pos % 7, pos / 7);
-        let x = x0.saturating_add(1).saturating_add(col as u16 * 3);
-        let y = y0.saturating_add(1).saturating_add(row as u16);
+        let x = pop.x.saturating_add(1).saturating_add(col as u16 * 3);
+        let y = pop.y.saturating_add(3).saturating_add(row as u16);
         let sel = day == cal.day;
         let (fg, bg) = if sel {
             (cal.selected_fg, cal.selected_bg)
         } else {
             (cal.foreground_color, cal.background_color)
         };
-        buf.fill_rect(Rect::new(x, y, 2, 1), Cell::new(' ', fg, bg));
+        buf.fill_rect(Rect::new(x, y, 3, 1), Cell::new(' ', fg, bg));
         draw_text(buf, x, y, &format!("{day:2}"), Attr::new(fg, bg));
-    }
-    if bordered {
-        let b = cal.border_color.unwrap_or(Color::Black);
-        let bc = Cell::new(' ', b, b);
-        for x in rect.x..rect.right() {
-            buf.set(x, rect.y, bc);
-            buf.set(x, rect.bottom().saturating_sub(1), bc);
-        }
-        for y in rect.y..rect.bottom() {
-            buf.set(rect.x, y, bc);
-            buf.set(rect.right().saturating_sub(1), y, bc);
-        }
     }
 }
 
@@ -211,14 +326,33 @@ pub fn calendar_draw(buf: &mut Buffer, rect: Rect, cal: &CalendarPicker) {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CalNav {
     Stay,
+    Opened,
     Move(i32, u8, u8),
-    Accept(i32, u8, u8),
+    Accepted(i32, u8, u8),
+    Cancelled,
 }
 
-/// Flechas mueven días (con cambio de mes), `PgUp/PgDn` meses,
-/// `Enter` acepta, `Esc` se trata fuera (cancela el diálogo).
+/// Cerrado: `Enter`/`Espacio` abre. Abierto: flechas días,
+/// `PgUp`/`PgDn` meses, `Home`/`End` extremos, `Enter` acepta y
+/// cierra, `Esc` restaura y cierra. Sin modificadores (años con
+/// `calendar_key_mod`).
 pub fn calendar_key(cal: &mut CalendarPicker, code: KeyCode) -> CalNav {
+    calendar_key_mod(cal, code, KeyModifiers::empty())
+}
+
+/// Como `calendar_key`, más `Shift`/`Ctrl`+`PgUp`/`PgDn` = años.
+pub fn calendar_key_mod(cal: &mut CalendarPicker, code: KeyCode, mods: KeyModifiers) -> CalNav {
     use CalNav::*;
+    if !cal.is_open {
+        return match code {
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                cal.open();
+                Opened
+            }
+            _ => Stay,
+        };
+    }
+    let years = mods.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL);
     match code {
         KeyCode::Left => {
             cal.add_days(-1);
@@ -237,11 +371,19 @@ pub fn calendar_key(cal: &mut CalendarPicker, code: KeyCode) -> CalNav {
             Move(cal.year, cal.month, cal.day)
         }
         KeyCode::PageUp => {
-            cal.add_months(-1);
+            if years {
+                cal.add_years(-1);
+            } else {
+                cal.add_months(-1);
+            }
             Move(cal.year, cal.month, cal.day)
         }
         KeyCode::PageDown => {
-            cal.add_months(1);
+            if years {
+                cal.add_years(1);
+            } else {
+                cal.add_months(1);
+            }
             Move(cal.year, cal.month, cal.day)
         }
         KeyCode::Home => {
@@ -252,7 +394,14 @@ pub fn calendar_key(cal: &mut CalendarPicker, code: KeyCode) -> CalNav {
             cal.day = days_in_month(cal.year, cal.month);
             Move(cal.year, cal.month, cal.day)
         }
-        KeyCode::Enter => Accept(cal.year, cal.month, cal.day),
+        KeyCode::Enter => {
+            cal.accept();
+            Accepted(cal.year, cal.month, cal.day)
+        }
+        KeyCode::Esc => {
+            cal.cancel();
+            Cancelled
+        }
         _ => Stay,
     }
 }
@@ -276,33 +425,131 @@ mod tests {
     }
 
     #[test]
-    fn arrows_roll_months() {
+    fn closed_opens_with_enter_or_space() {
+        let mut c = CalendarPicker::new(2026, 9, 15);
+        assert!(!c.is_open);
+        assert_eq!(calendar_key(&mut c, KeyCode::Enter), CalNav::Opened);
+        assert!(c.is_open);
+        let mut c2 = CalendarPicker::new(2026, 9, 15);
+        assert_eq!(calendar_key(&mut c2, KeyCode::Char(' ')), CalNav::Opened);
+        // Cerrado, lo demás no hace nada.
+        let mut c3 = CalendarPicker::new(2026, 9, 15);
+        assert_eq!(calendar_key(&mut c3, KeyCode::Right), CalNav::Stay);
+        assert_eq!((c3.year, c3.month, c3.day), (2026, 9, 15));
+    }
+
+    #[test]
+    fn open_navigates_months_and_years() {
         let mut c = CalendarPicker::new(2026, 9, 30);
-        calendar_key(&mut c, KeyCode::Right);
-        assert_eq!((c.year, c.month, c.day), (2026, 10, 1));
-        calendar_key(&mut c, KeyCode::Left);
-        assert_eq!((c.year, c.month, c.day), (2026, 9, 30));
-        calendar_key(&mut c, KeyCode::PageDown);
-        assert_eq!((c.year, c.month), (2026, 10));
-        assert_eq!(c.day, 30);
+        calendar_key(&mut c, KeyCode::Enter); // abre
+        assert_eq!(
+            calendar_key(&mut c, KeyCode::Right),
+            CalNav::Move(2026, 10, 1)
+        );
+        assert_eq!(
+            calendar_key(&mut c, KeyCode::Left),
+            CalNav::Move(2026, 9, 30)
+        );
+        assert_eq!(
+            calendar_key(&mut c, KeyCode::PageDown),
+            CalNav::Move(2026, 10, 30)
+        );
+        // Shift+PgDn = año (Ctrl es la alternativa configurable).
+        assert_eq!(
+            calendar_key_mod(&mut c, KeyCode::PageDown, KeyModifiers::SHIFT),
+            CalNav::Move(2027, 10, 30)
+        );
+        assert_eq!(
+            calendar_key_mod(&mut c, KeyCode::PageUp, KeyModifiers::CONTROL),
+            CalNav::Move(2026, 10, 30)
+        );
         // Febrero recorta al día válido.
         let mut f = CalendarPicker::new(2026, 1, 31);
+        calendar_key(&mut f, KeyCode::Enter);
         calendar_key(&mut f, KeyCode::PageDown);
         assert_eq!((f.month, f.day), (2, 28));
     }
 
     #[test]
-    fn draws_grid_with_selection() {
+    fn enter_accepts_and_esc_restores() {
+        let mut c = CalendarPicker::new(2026, 9, 15);
+        calendar_key(&mut c, KeyCode::Enter);
+        calendar_key(&mut c, KeyCode::Right);
+        calendar_key(&mut c, KeyCode::Right);
+        assert_eq!(
+            calendar_key(&mut c, KeyCode::Enter),
+            CalNav::Accepted(2026, 9, 17)
+        );
+        assert!(!c.is_open);
+        assert_eq!((c.year, c.month, c.day), (2026, 9, 17));
+        // Esc restaura lo confirmado al abrir.
+        let mut d = CalendarPicker::new(2026, 9, 15);
+        calendar_key(&mut d, KeyCode::Enter);
+        calendar_key(&mut d, KeyCode::Right);
+        assert_eq!(calendar_key(&mut d, KeyCode::Esc), CalNav::Cancelled);
+        assert!(!d.is_open);
+        assert_eq!((d.year, d.month, d.day), (2026, 9, 15));
+    }
+
+    #[test]
+    fn collapsed_field_draws_mask_and_icon() {
         let t = Theme::clipper();
-        let mut b = Buffer::blank(40, 14, t.desktop);
+        let mut b = Buffer::blank(40, 6, t.desktop);
         let c = CalendarPicker::new(2026, 9, 8);
-        calendar_draw(&mut b, Rect::new(2, 1, 24, 10), &c);
-        // Título centrado ("Septiembre 2026" en x=6) + cabecera + día 8.
-        assert_eq!(b.get(6, 1).unwrap().ch, 'S'); // Septiembre
-        assert_eq!(b.get(3, 3).unwrap().ch, 'L');
-        // Día 1 (martes, col 1): x = 2+1+3 = 6, y = 3+1 = 4.
-        assert_eq!(b.get(7, 4).unwrap().ch, '1');
-        // Día 8 misma columna, resaltado navy.
-        assert_eq!(b.get(7, 5).unwrap().bg, c.selected_bg);
+        calendar_draw(&mut b, Rect::new(2, 1, 21, 1), &c);
+        // ` [ 08/09/2026 ] [ <icon> ]`: corchete, fecha e icono NF.
+        assert_eq!(b.get(2, 1).unwrap().ch, ' ');
+        assert_eq!(b.get(3, 1).unwrap().ch, '[');
+        assert_eq!(b.get(5, 1).unwrap().ch, '0');
+        assert_eq!(b.get(8, 1).unwrap().ch, '0');
+        assert_eq!(b.get(9, 1).unwrap().ch, '9');
+        assert_eq!(b.get(20, 1).unwrap().ch, '\u{f073}');
+        assert_eq!(b.get(22, 1).unwrap().ch, ']');
+    }
+
+    #[test]
+    fn open_popup_draws_double_box_and_selection() {
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(40, 16, t.desktop);
+        let mut c = CalendarPicker::new(2026, 9, 8);
+        calendar_key(&mut c, KeyCode::Enter);
+        calendar_draw(&mut b, Rect::new(2, 1, 21, 1), &c);
+        // Popup 23×10 bajo el campo: esquinas CP437 doble línea.
+        let pop = calendar_popup_rect(Rect::new(2, 1, 21, 1), Rect::new(0, 0, 40, 16));
+        assert_eq!(pop, Rect::new(2, 2, 23, 10));
+        assert_eq!(b.get(2, 2).unwrap().ch, '\u{2554}'); // ╔
+        assert_eq!(b.get(24, 2).unwrap().ch, '\u{2557}'); // ╗
+        assert_eq!(b.get(2, 11).unwrap().ch, '\u{255a}'); // ╚
+        assert_eq!(b.get(24, 11).unwrap().ch, '\u{255d}'); // ╝
+                                                           // Cabecera con mes en mayúsculas + navegación.
+        assert_eq!(b.get(3, 3).unwrap().ch, '\u{ab}'); // «
+        assert_eq!(b.get(6, 3).unwrap().ch, 'S'); // SEPTIEMBRE
+                                                  // Semana centrada + día 1 (martes, col 1): x = 3+3 = 6, y = 5.
+        assert_eq!(b.get(3, 4).unwrap().ch, 'L');
+        assert_eq!(b.get(7, 5).unwrap().ch, '1');
+        // Día 8 misma columna, cursor Clipper (fondo navy).
+        assert_eq!(b.get(6, 6).unwrap().bg, c.selected_bg);
+        // Sombra translúcida a la derecha (offset 2,1): celda atenuada.
+        assert!(b.get(25, 3).unwrap().dim);
+    }
+
+    #[test]
+    fn popup_opens_above_when_no_room_below() {
+        let screen = Rect::new(0, 0, 80, 25);
+        let pop = calendar_popup_rect(Rect::new(2, 20, 21, 1), screen);
+        assert_eq!((pop.y, pop.h), (10, 10)); // 20-10 encima del campo
+        let pop2 = calendar_popup_rect(Rect::new(2, 1, 21, 1), screen);
+        assert_eq!((pop2.y, pop2.h), (2, 10)); // debajo: y = 1+1
+    }
+
+    #[test]
+    fn tiny_rects_do_not_panic() {
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(10, 4, t.desktop);
+        let mut c = CalendarPicker::new(2026, 9, 8);
+        calendar_draw(&mut b, Rect::new(0, 0, 0, 0), &c);
+        calendar_key(&mut c, KeyCode::Enter);
+        calendar_draw(&mut b, Rect::new(1, 1, 8, 2), &c); // popup no cabe: solo campo
+        assert_eq!(b.get(1, 1).unwrap().ch, ' ');
     }
 }

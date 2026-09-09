@@ -3,12 +3,14 @@
 //! Escritorio con menubar, iconos de unidad, panel de árbol con iconos de
 //! carpeta, panel de archivos con tabla + scrollbars y diálogo central con
 //! radios `○/◉` + casillas `☐/☑` + dropdown + inputs (texto/clave) +
+//! fecha (calendario popup) +
 //! listbox con scrollbar + progressbar + botones OK/Cancel (ancho mínimo 10,
 //! sombra CUA, clic animado), F-bar compacta (`F¹Help…`) y status.
 //!
-//! Foco con Tab: árbol → archivos → dropdown → nombre → clave → radios A →
-//! radios B → casillas → lista → progreso → botones. Flechas mueven, Espacio
-//! alterna/elige, Enter acepta, Esc sale. En progreso: `←→` ajusta ±5.
+//! Foco con Tab: árbol → archivos → dropdown → nombre → clave → fecha →
+//! radios A → radios B → casillas → lista → progreso → botones. Flechas
+//! mueven, Espacio alterna/elige, Enter acepta, Esc sale. En progreso:
+//! `←→` ajusta ±5. En fecha: `PgUp/PgDn` mes, `Shift`+`PgUp/PgDn` año.
 //!
 //! ```sh
 //! cargo run --example showroom
@@ -17,19 +19,20 @@
 use std::io::{self, stdout};
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
 use g90tui::{
-    button_draw, button_width, check_key, draw_text, drive, dropdown_draw, dropdown_key,
-    enter_screen, filedialog_draw, filedialog_key, fkey_bar_compact, folder, grid_draw, input_draw,
-    input_key, leave_screen, list_key, listbox_draw, listbox_key, menubar_draw, msgbox_draw,
-    msgbox_key, progressbar_draw, radio_key, statusbar_draw, tab_draw, tab_key, table_draw,
-    table_key, top_bar, tuichart_draw, vscrollbar, window, Alignment, Attr, Backend, Buffer,
-    Buttons, Cell, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend,
-    Dropdown, DropdownKey, EventCtx, FKeyDef, FKeyStyle, FileDialog, FileDialogKey, FocusManager,
-    FolderGlyphs, GlyphSet, GridTable, HandleEvent, HotAttrs, InputField, InputKey, ListBox,
-    MenuDef, MsgBoxKey, RadioNav, Rect, Screen, StatusBar, TabControl, TabPosition, TableDef,
-    TableState, Theme, TuiChart, WindowOpts,
+    button_draw, button_width, calendar_draw, calendar_field_width, calendar_key_mod, check_key,
+    draw_text, drive, dropdown_draw, dropdown_key, enter_screen, filedialog_draw, filedialog_key,
+    fkey_bar_compact, folder, grid_draw, input_draw, input_key, leave_screen, list_key,
+    listbox_draw, listbox_key, menubar_draw, msgbox_draw, msgbox_key, progressbar_draw, radio_key,
+    statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar, tuichart_draw, vscrollbar,
+    window, Alignment, Attr, Backend, Buffer, Buttons, CalNav, CalendarPicker, Cell, ChartKind,
+    ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend, Dropdown, DropdownKey,
+    EventCtx, FKeyDef, FKeyStyle, FileDialog, FileDialogKey, FocusManager, FolderGlyphs, GlyphSet,
+    GridTable, HandleEvent, HotAttrs, InputField, InputKey, ListBox, MenuDef, MsgBoxKey, RadioNav,
+    Rect, Screen, StatusBar, TabControl, TabPosition, TableDef, TableState, Theme, TuiChart,
+    WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder()`.
@@ -53,7 +56,7 @@ const TREE: [(&str, &str, bool); 14] = [
 const RADIO_A: [&str; 3] = ["&Full Encryption", "&Quick Encryption", "&No Encryption"];
 const RADIO_B: [&str; 3] = ["&No Delete", "&Quick Delete", "&DOD Delete"];
 
-const FOCUS_NAMES: [&str; 12] = [
+const FOCUS_NAMES: [&str; 13] = [
     "árbol",
     "archivos",
     "dropdown",
@@ -66,6 +69,7 @@ const FOCUS_NAMES: [&str; 12] = [
     "progreso",
     "botones",
     "pestañas",
+    "fecha",
 ];
 
 struct Show {
@@ -78,6 +82,7 @@ struct Show {
     dropdown: Dropdown,
     input_name: InputField,
     input_pass: InputField,
+    cal: CalendarPicker,
     radio_a: usize,
     radio_b: usize,
     checks: Vec<CheckItem>,
@@ -233,6 +238,7 @@ impl Show {
                 p.mask = Some('*');
                 p
             },
+            cal: CalendarPicker::current(),
             radio_a: 1,
             radio_b: 1,
             checks: vec![
@@ -362,7 +368,7 @@ impl Show {
         // Declaración de ámbitos (nombres = etiquetas de pestaña):
         // General ve todo; Inventario solo su grid + comunes.
         show.fm
-            .add_scope("General", &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+            .add_scope("General", &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
         show.fm.add_scope("Inventario", &[0, 1, 8, 9, 10, 11]);
         show.fm.set_active("General");
         show
@@ -580,6 +586,7 @@ impl Show {
             let rx = vp.x.saturating_add(vp.w / 2).saturating_add(1);
             let label_attr = Attr::new(Color::Black, t.dialog);
             let dd_rect = Rect::new(lx.saturating_add(8), d.y + 2, 20, 1);
+            let cal_rect = Rect::new(lx.saturating_add(8), d.y + 6, calendar_field_width(), 1);
             if focus == 11 {
                 let (mx, my) = if self.tabs.position == TabPosition::Left {
                     (tab_box.x, tab_box.y + 1 + self.tabs.active as u16)
@@ -637,6 +644,11 @@ impl Show {
                 }
                 if focus == 4 {
                     draw_text(buf, lx - 1, d.y + 5, "►", Attr::bold(Color::Red, t.dialog));
+                }
+                // Fecha con popup de calendario (fila 6, overlay al final).
+                draw_text(buf, lx, d.y + 6, "Fecha:", label_attr);
+                if focus == 12 {
+                    draw_text(buf, lx - 1, d.y + 6, "►", Attr::bold(Color::Red, t.dialog));
                 }
 
                 // Radios A (izq) y lista con scrollbar (der).
@@ -752,9 +764,11 @@ impl Show {
             let fx = d.x.saturating_add(d.w.saturating_sub(fw).saturating_sub(2));
             draw_text(buf, fx, d.y + d.h - 1, &fl, base);
 
-            // Dropdown al final: línea + overlay encima (solo página General).
+            // Dropdown + calendario al final: línea + overlays encima
+            // (solo página General).
             if self.tabs.active == 0 {
                 dropdown_draw(buf, dd_rect, &self.dropdown, t);
+                calendar_draw(buf, cal_rect, &self.cal);
             }
         }
 
@@ -778,7 +792,7 @@ impl Show {
     }
 
     /// Devuelve `false` para salir.
-    fn key(&mut self, code: KeyCode) -> bool {
+    fn key(&mut self, code: KeyCode, mods: KeyModifiers) -> bool {
         // Modal de archivos: captura todo (Esc cancela, Enter acepta).
         if self.file_dialog.is_some() {
             if code == KeyCode::Esc {
@@ -832,9 +846,14 @@ impl Show {
             return true;
         }
         if code == KeyCode::Esc {
-            // Si el dropdown está abierto, Esc primero lo cancela.
+            // Si hay un popup abierto, Esc primero lo cancela.
             if self.dropdown.is_open {
                 dropdown_key(&mut self.dropdown, code);
+                return true;
+            }
+            if self.cal.is_open {
+                calendar_key_mod(&mut self.cal, code, mods);
+                self.message = "Fecha cancelada.".to_string();
                 return true;
             }
             return false;
@@ -871,6 +890,19 @@ impl Show {
                 }
                 DropdownKey::Cancelled => {
                     self.message = "Dropdown cancelado.".to_string();
+                }
+                _ => {}
+            }
+            return true;
+        }
+        // Calendario abierto: captura todo (año con Shift/Ctrl+PgUp/PgDn).
+        if self.cal.is_open {
+            match calendar_key_mod(&mut self.cal, code, mods) {
+                CalNav::Accepted(y, m, d) => {
+                    self.message = format!("Fecha: {d:02}/{m:02}/{y:04}.");
+                }
+                CalNav::Cancelled => {
+                    self.message = "Fecha cancelada.".to_string();
                 }
                 _ => {}
             }
@@ -997,6 +1029,16 @@ impl Show {
                 }
                 _ => {}
             },
+            // Fecha del calendario (página General).
+            12 => match calendar_key_mod(&mut self.cal, code, mods) {
+                CalNav::Accepted(y, m, d) => {
+                    self.message = format!("Fecha: {d:02}/{m:02}/{y:04}.");
+                }
+                CalNav::Opened => {
+                    self.message = "Fecha: elige día (Enter acepta, Esc cancela).".to_string();
+                }
+                _ => {}
+            },
             // Pestañas del diálogo: flechas cambian de página, `t` rota Top/Left.
             // Al cambiar de página se re-activa su ámbito: el foco salta
             // solo a widgets visibles (nunca a la página oculta).
@@ -1018,7 +1060,7 @@ impl Show {
                     }
                 }
             }
-            _ => {} // focus siempre < 12; defensivo
+            _ => {} // focus siempre < 13; defensivo
         }
         true
     }
@@ -1046,7 +1088,7 @@ fn run() -> io::Result<()> {
                     if k.kind == KeyEventKind::Release {
                         continue;
                     }
-                    if !show.key(k.code) {
+                    if !show.key(k.code, k.modifiers) {
                         break;
                     }
                     show.paint();

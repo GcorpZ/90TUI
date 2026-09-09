@@ -29,8 +29,8 @@ pub mod tabs;
 pub mod textarea;
 
 pub use calendar::{
-    calendar_draw, calendar_key, civil_from_days, days_from_civil, days_in_month, is_leap, weekday,
-    CalNav, CalendarPicker,
+    calendar_draw, calendar_field_width, calendar_key, calendar_key_mod, calendar_popup_rect,
+    civil_from_days, days_from_civil, days_in_month, is_leap, weekday, CalNav, CalendarPicker,
 };
 
 pub use chart::{

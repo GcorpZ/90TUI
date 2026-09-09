@@ -32,10 +32,11 @@ pub use prim::{
     BUTTON_MIN_WIDTH,
 };
 pub use widgets::{
-    bar_fill_width, bar_heights, calendar_draw, calendar_key, check_key, check_width,
-    check_width_styled, checkbox_draw, civil_from_days, confirm_draw, confirm_key, confirm_layout,
-    days_from_civil, days_in_month, dropdown_draw, dropdown_key, dropdown_overlay_rect,
-    dropdown_size, filedialog_draw, filedialog_key, filedialog_layout, fkey_bar, fkey_bar_compact,
+    bar_fill_width, bar_heights, calendar_draw, calendar_field_width, calendar_key,
+    calendar_key_mod, calendar_popup_rect, check_key, check_width, check_width_styled,
+    checkbox_draw, civil_from_days, confirm_draw, confirm_key, confirm_layout, days_from_civil,
+    days_in_month, dropdown_draw, dropdown_key, dropdown_overlay_rect, dropdown_size,
+    filedialog_draw, filedialog_key, filedialog_layout, fkey_bar, fkey_bar_compact,
     fkey_bar_stacked, fkey_bar_styled, form_draw, form_key, grid_column_widths, grid_draw,
     grid_key, grid_visible, hyperlink_draw, input_draw, input_key, is_leap, line_dots, list_draw,
     list_key, listbox_draw, listbox_key, listbox_visible, menubar_draw, menubar_key, msgbox_draw,
