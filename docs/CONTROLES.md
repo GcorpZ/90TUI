@@ -15,7 +15,8 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 `has_shadow` — presentes en `ButtonOpts`, `WindowOpts` (`shadow` +
 `border_color`), `CheckStyle`, `FKeyStyle` (`has_shadow`), `Dropdown`,
 `InputField`, `ProgressBar`, `ListBox`, `StatusBar`, `FileDialog`,
-`TextArea`, `Hyperlink` y `TuiChart`.
+`TextArea`, `Hyperlink`, `TuiChart`, `TabControl`, `GridTable`,
+`CalendarPicker` y `MsgBox` (vía `Buttons` + botones de 1 fila).
 
 ## prim — primitivas de dibujo (`tui90::prim`)
 
@@ -58,7 +59,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `checkbox_draw(buf, x, y, item, focused, style)` | `CheckItem{label, checked}` | `check_key` → `Move/Toggled`; Espacio/letra alterna |
 | `radio_draw(buf, x, y, label, sel, focus, style)` | — | `radio_key` → `Select`; flechas eligen directo |
 | `CheckStyle::new(attrs, GlyphSet::{modern, ascii})` | colores + glifos | integrales `☐/☑` `○/◉` o ASCII con marcos (+`border_color`, `has_shadow` fila) |
-| `dropdown_draw(buf, rect, dd, theme)` | `Dropdown{options, selected_index, is_open, label, max_height, bg/fg/active_bg, border_color, has_shadow}` | cerrado: selección + `▼`; abierto: overlay + scroll + `dropdown_key` |
+| `dropdown_draw(buf, rect, dd, theme)` | `Dropdown{options, selected_index, is_open, label, max_height, bg/fg/active_bg, border_color, has_shadow}` | cerrado: selección + `▼`; abierto: overlay + scroll + `dropdown_key` (`↑↓` circular, `Enter` acepta, letra filtra) |
 | `input_draw(buf, rect, field, focused)` | `InputField{value, max_len, mask, cursor, fg/bg/active_bg, border_color, has_shadow}` | `input_key` → inserta/borra/mueve; máscara solo visual |
 | `progressbar_draw(buf, rect, bar)` | `ProgressBar{pct 0-100, fg/bg, border_color, has_shadow, show_pct}` | `█` `\u{2588}` / `░` `\u{2591}` + `NN%` si cabe |
 | `listbox_draw(buf, rect, lb)` | `ListBox{items, selected, top, fg/bg/highlight, border_color, has_shadow}` | scrollbar `▲`/`▼` + `█` proporcional; `listbox_key` (flechas/PgUp/PgDn/letra) |
@@ -72,6 +73,10 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `textarea_draw(buf, rect, area, focused)` | `TextArea{lines, cursor, max_chars, fg/bg/active_bg, border_color, has_shadow}` | `textarea_key` → Enter parte línea, flechas/PgUp/PgDn navegan, scroll vertical |
 | `hyperlink_draw(buf, x, y, link)` | `Hyperlink{text, url}` | texto negrita coloreado; `osc8_sequence()` = `\x1b]8;;URL\x1b\\TEXTO\x1b]8;;\x1b\\` clickeable |
 | `tuichart_draw(buf, rect, chart)` | `TuiChart{kind: Bars3D/Line/Pie, series: [(label, value)]}` | barras `█`+`▒` 3D · líneas braille `⠃⠇⠽` · tarta sectorial + leyenda `%` |
+| `tab_draw(buf, rect, tabs)` | `TabControl{tabs:[{label, fg, bg}], active, position: Top/Left}` | `tab_viewport(rect)` = área útil de página; `tab_key` (`←→`/`↑↓` circular, `t` rota en demo) |
+| `grid_draw(buf, rect, grid)` | `GridTable{headers, rows, widths (0=auto)}` | anchos auto/fijos, fila resaltada, scroll vertical; `grid_key` (flechas/PgUp/PgDn) |
+| `msgbox_draw(buf, screen, título, msg, buttons, sel, theme)` | `Buttons::{Ok, OkCancel, YesNo}` | modal centrado + wrap + botones 1 fila con `▀`; `msgbox_key` → `Accept(i)`/`Cancel` |
+| `calendar_draw(buf, rect, cal)` | `CalendarPicker::new/current()` (matemática civil propia) | cuadrícula 7 col L–D, selección invertida; `calendar_key` (flechas/PgUp/PgDn/`Enter`) |
 | `popup_size(items)` | — | `(w, h)` para layout manual |
 
 ## app — shell (`tui90::app`)

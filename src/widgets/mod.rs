@@ -5,23 +5,32 @@
 //! apilar. La navegación es pura (`*_key`) para probarse sin TTY;
 //! el loop de eventos llega en Fase 6 (`app`).
 
+pub mod calendar;
 pub mod chart;
 pub mod checkradio;
 pub mod dialog;
 pub mod dropdown;
 pub mod filedialog;
 pub mod form;
+pub mod grid;
 pub mod hyperlink;
 pub mod input;
 pub mod list;
 pub mod listbox;
 pub mod menubar;
+pub mod msgbox;
 pub mod popup;
 pub mod progress;
 pub mod progressbar;
 pub mod statusbar;
 pub mod table;
+pub mod tabs;
 pub mod textarea;
+
+pub use calendar::{
+    calendar_draw, calendar_key, civil_from_days, days_from_civil, days_in_month, is_leap, weekday,
+    CalNav, CalendarPicker,
+};
 
 pub use chart::{
     bar_heights, line_dots, pie_sectors, tuichart_draw, ChartKind, ChartPoint, TuiChart,
@@ -38,11 +47,13 @@ pub use filedialog::{
     filedialog_draw, filedialog_key, filedialog_layout, FileDialog, FileDialogKey,
 };
 pub use form::{form_draw, form_key, Field, FieldKind, FormKey, FormState};
+pub use grid::{grid_column_widths, grid_draw, grid_key, grid_visible, GridNav, GridTable};
 pub use hyperlink::{hyperlink_draw, Hyperlink};
 pub use input::{input_draw, input_key, InputField, InputKey};
 pub use list::{list_draw, list_key};
 pub use listbox::{listbox_draw, listbox_key, listbox_visible, ListBox, ListNav};
 pub use menubar::{menubar_draw, menubar_key, MenuBarKey, MenuDef, MenuItem};
+pub use msgbox::{msgbox_draw, msgbox_key, msgbox_layout, msgbox_wrap, Buttons, MsgBoxKey};
 pub use popup::{popup_draw, popup_key, popup_layout, popup_size, PopupItem, PopupKey};
 pub use progress::{bar_fill_width, progress_draw, BarInfo, ProgressInfo};
 pub use progressbar::{progress_fill, progressbar_draw, ProgressBar};
@@ -51,4 +62,5 @@ pub use statusbar::{
     FKeyStyle, StatusBar, StatusColumn,
 };
 pub use table::{table_draw, table_key, TableDef, TableState};
+pub use tabs::{tab_draw, tab_key, tab_viewport, Tab, TabControl, TabNav, TabPosition};
 pub use textarea::{textarea_draw, textarea_key, textarea_visible, TextArea, TextAreaKey};

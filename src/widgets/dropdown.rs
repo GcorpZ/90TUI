@@ -252,7 +252,9 @@ pub fn dropdown_key(dd: &mut Dropdown, code: KeyCode) -> DropdownKey {
         dd.cursor = clamp(dd.cursor);
         match code {
             KeyCode::Up => {
-                dd.cursor = clamp(dd.cursor + n - 1) % n;
+                // Circular: 0 → última. (cursor ya < n por el clamp de arriba;
+                // sin clamp intermedio: `clamp(c + n - 1) % n` se congelaba).
+                dd.cursor = (dd.cursor + n - 1) % n;
                 dd.ensure_visible();
                 Moved(dd.cursor)
             }
@@ -338,6 +340,20 @@ mod tests {
         assert!(!d.is_open);
         assert_eq!(d.selected_index, 1);
         assert_eq!(d.selected(), "Compras");
+    }
+
+    #[test]
+    fn up_moves_and_wraps_circularly() {
+        let mut d = dd(); // 3 opciones
+        dropdown_key(&mut d, KeyCode::Enter); // abre, cursor = 0
+        assert_eq!(dropdown_key(&mut d, KeyCode::Down), DropdownKey::Moved(1));
+        // Arriba desde 1 → 0 (antes: bug clamp saltaba a n-1 y se congelaba).
+        assert_eq!(dropdown_key(&mut d, KeyCode::Up), DropdownKey::Moved(0));
+        // Arriba desde 0 → última (circular).
+        assert_eq!(dropdown_key(&mut d, KeyCode::Up), DropdownKey::Moved(2));
+        // Y sigue navegando (no se congela).
+        assert_eq!(dropdown_key(&mut d, KeyCode::Up), DropdownKey::Moved(1));
+        assert_eq!(dropdown_key(&mut d, KeyCode::Down), DropdownKey::Moved(2));
     }
 
     #[test]
