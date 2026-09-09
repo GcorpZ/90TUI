@@ -4,7 +4,7 @@
 //!   (icono Nerd Font `\u{f073}`). `Enter`/`Espacio` abre el popup.
 //!   La máscara la elige el programador (`datemask`: `YYYY`/`YY`/`MM`/`M`/
 //!   `DD`/`D`, resto literal); sin ella, estándar `DD/MM/AAAA`.
-//! * **Abierto:** overlay de 23×10 con caja CP437 de doble línea,
+//! * **Abierto:** overlay de 23×10 con caja de línea simple,
 //!   cabecera `«◄ MES AAAA ►»`, semana `Lu..Do`, cursor Clipper en el
 //!   día y **hoy en negrita roja** (`today_fg`). Flechas mueven días,
 //!   `PgUp`/`PgDn` meses, `Shift`/`Ctrl`+`PgUp`/`PgDn` años,
@@ -42,13 +42,13 @@ const POPUP_H: u16 = 10;
 /// Cabecera de columnas (20 celdas, centrada en el interior de 21).
 const WEEK_HEAD: &str = "Lu Ma Mi Ju Vi Sa Do";
 
-/// Caja CP437 de doble línea.
-const BOX_TL: char = '\u{2554}'; // ╔
-const BOX_TR: char = '\u{2557}'; // ╗
-const BOX_BL: char = '\u{255a}'; // ╚
-const BOX_BR: char = '\u{255d}'; // ╝
-const BOX_H: char = '\u{2550}'; // ═
-const BOX_V: char = '\u{2551}'; // ║
+/// Caja de línea simple.
+const BOX_TL: char = '\u{250c}'; // ┌
+const BOX_TR: char = '\u{2510}'; // ┐
+const BOX_BL: char = '\u{2514}'; // └
+const BOX_BR: char = '\u{2518}'; // ┘
+const BOX_H: char = '\u{2500}'; // ─
+const BOX_V: char = '\u{2502}'; // │
 /// Navegación de la cabecera: `«`/`»` años rápidos, `◄`/`►` meses.
 const HDR_PREV_YEAR: char = '\u{ab}'; // «
 const HDR_PREV_MONTH: char = '\u{25c4}'; // ◄
@@ -281,7 +281,7 @@ pub fn calendar_draw(buf: &mut Buffer, rect: Rect, cal: &CalendarPicker) {
         pop,
         Cell::new(' ', cal.foreground_color, cal.background_color),
     );
-    // Caja CP437 de doble línea.
+    // Caja de línea simple.
     let bc = Attr::new(
         cal.border_color.unwrap_or(cal.foreground_color),
         cal.background_color,
@@ -622,19 +622,19 @@ mod tests {
     }
 
     #[test]
-    fn open_popup_draws_double_box_and_selection() {
+    fn open_popup_draws_single_box_and_selection() {
         let t = Theme::clipper();
         let mut b = Buffer::blank(40, 16, t.desktop);
         let mut c = CalendarPicker::new(2026, 9, 8);
         calendar_key(&mut c, KeyCode::Enter);
         calendar_draw(&mut b, Rect::new(2, 1, 21, 1), &c);
-        // Popup 23×10 bajo el campo: esquinas CP437 doble línea.
+        // Popup 23×10 bajo el campo: esquinas de línea simple.
         let pop = calendar_popup_rect(Rect::new(2, 1, 21, 1), Rect::new(0, 0, 40, 16));
         assert_eq!(pop, Rect::new(2, 2, 23, 10));
-        assert_eq!(b.get(2, 2).unwrap().ch, '\u{2554}'); // ╔
-        assert_eq!(b.get(24, 2).unwrap().ch, '\u{2557}'); // ╗
-        assert_eq!(b.get(2, 11).unwrap().ch, '\u{255a}'); // ╚
-        assert_eq!(b.get(24, 11).unwrap().ch, '\u{255d}'); // ╝
+        assert_eq!(b.get(2, 2).unwrap().ch, '\u{250c}'); // ┌
+        assert_eq!(b.get(24, 2).unwrap().ch, '\u{2510}'); // ┐
+        assert_eq!(b.get(2, 11).unwrap().ch, '\u{2514}'); // └
+        assert_eq!(b.get(24, 11).unwrap().ch, '\u{2518}'); // ┘
                                                            // Cabecera con mes en mayúsculas + navegación.
         assert_eq!(b.get(3, 3).unwrap().ch, '\u{ab}'); // «
         assert_eq!(b.get(6, 3).unwrap().ch, 'S'); // SEPTIEMBRE
