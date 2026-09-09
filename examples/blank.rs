@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
-use tui90::{enter_screen, leave_screen, Backend, Cell, CrosstermBackend, Rect, Screen, Theme};
+use g90tui::{enter_screen, leave_screen, Backend, Cell, CrosstermBackend, Rect, Screen, Theme};
 
 fn paint(s: &mut Screen) {
     let t = s.theme;
@@ -34,7 +34,7 @@ fn paint(s: &mut Screen) {
     s.frame().text(
         2,
         bounds.h.saturating_sub(1),
-        "TUI90 Demo v0.0.1",
+        "G90TUI Demo v0.0.1",
         t.status_fg,
         t.navy,
     );

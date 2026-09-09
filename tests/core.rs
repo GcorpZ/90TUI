@@ -3,7 +3,7 @@
 //! Rectángulos con recorte, diff del back-buffer, pila LIFO y backend
 //! de pruebas. Todo sin TTY real.
 
-use tui90::{Backend, Buffer, Cell, Color, Rect, Screen, ScreenStack, TestBackend, Theme};
+use g90tui::{Backend, Buffer, Cell, Color, Rect, Screen, ScreenStack, TestBackend, Theme};
 
 #[test]
 fn rect_clip_keeps_popup_inside_80x25() {

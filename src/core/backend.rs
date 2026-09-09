@@ -66,7 +66,7 @@ impl<W: Write> Backend for CrosstermBackend<W> {
 }
 
 /// Entra a pantalla alternativa + raw mode + oculta cursor.
-/// Es el "modo gráfico" de 90TUI. Llamar una vez al arrancar.
+/// Es el "modo gráfico" de G90TUI. Llamar una vez al arrancar.
 pub fn enter_screen() -> io::Result<()> {
     terminal::enable_raw_mode()?;
     io::stdout().execute(EnterAlternateScreen)?.execute(Hide)?;

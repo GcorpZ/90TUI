@@ -1,9 +1,9 @@
-# 90TUI — FASE 0: Análisis visual y técnicas (escuela Clipper vs Turbo Vision)
+# G90TUI — FASE 0: Análisis visual y técnicas (escuela Clipper vs Turbo Vision)
 
-> Rama: `90tui-docs` | Fecha: 2026-09-07 | Rol: Ingeniero de Sistemas / Software graduado 90s
-> Fuentes visuales: set de capturas de apps de gestión DOS de principios de los 90 (`90tui_ref/`) + set Norton/PC Tools (`90tui_ref/NDD/`)
+> Rama: `g90tui-docs` | Fecha: 2026-09-07 | Rol: Ingeniero de Sistemas / Software graduado 90s
+> Fuentes visuales: set de capturas de apps de gestión DOS de principios de los 90 (`g90tui_ref/`) + set Norton/PC Tools (`g90tui_ref/NDD/`)
 
-> **Nota legal y de origen:** 90TUI es un proyecto independiente que nace de recordar la *tecnología* y las *técnicas* de la época —acceso directo a VRAM, doble buffering, pila `Savescreen()/Restscreen()`, paletas de 16 colores, fuentes VGA programables— popularizadas por el ecosistema **CA-Clipper a principios de los 90** (el compilador traía pantallas apilables y menús de texto; librerías de terceros en C/ASM añadieron ventanas, sombras duras y glifos propios). No existe afiliación ni relación con ningún producto comercial de la época; los nombres de terceros citados como referencia histórica pertenecen a sus respectivos dueños. En este documento los datos concretos de las capturas (razones sociales, seriales, versiones) se describen en genérico a propósito.
+> **Nota legal y de origen:** G90TUI es un proyecto independiente que nace de recordar la *tecnología* y las *técnicas* de la época —acceso directo a VRAM, doble buffering, pila `Savescreen()/Restscreen()`, paletas de 16 colores, fuentes VGA programables— popularizadas por el ecosistema **CA-Clipper a principios de los 90** (el compilador traía pantallas apilables y menús de texto; librerías de terceros en C/ASM añadieron ventanas, sombras duras y glifos propios). No existe afiliación ni relación con ningún producto comercial de la época; los nombres de terceros citados como referencia histórica pertenecen a sus respectivos dueños. En este documento los datos concretos de las capturas (razones sociales, seriales, versiones) se describen en genérico a propósito.
 
 Pude VER las imágenes. No hizo falta alternativa. Lo que sigue es peritaje directo píxel a píxel.
 
@@ -83,7 +83,7 @@ Original DOS (ambos):
 4. Fuentes: cargar 512 glifos en RAM VGA para iconos/mouse/flechas.
 5. Memoria: enlazadores en modo protegido, overlays + XMS para tablas masivas.
 
-Emulación 90TUI (terminal moderna, sin acceso a VRAM):
+Emulación G90TUI (terminal moderna, sin acceso a VRAM):
 1. `BackBuffer = Vec<Cell{ch, fg, bg, bold}>` 80x25 escalable a cualquier tamaño (responsive).
 2. `Savescreen = push(buffer.clone_rect)` / `Restscreen = pop()` — pila, igual que Clipper.
 3. Render por diff: solo celdas cambiadas → `crossterm::queue!` + ANSI. Tan instantáneo como el `memcpy` a `0xB800`.

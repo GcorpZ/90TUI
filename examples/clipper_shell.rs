@@ -14,7 +14,7 @@
 use std::io;
 use std::time::Duration;
 
-use tui90::{
+use g90tui::{
     confirm_draw, confirm_key, draw_text, enter_screen, leave_screen, match_fkey, menu_title_x,
     menubar_key, popup_draw, popup_key, popup_layout, to_crossterm, App, AppEvent, AppKey, Attr,
     Color, DialogKey, FKeyDef, Layer, MenuBarKey, MenuDef, PopupItem, PopupKey,
@@ -74,10 +74,10 @@ impl Shell {
 
     fn paint(&mut self) {
         let t = self.app.screen.theme;
-        self.app.paint_shell(&tui90::ShellContent {
+        self.app.paint_shell(&g90tui::ShellContent {
             company: "EMPRESA DEMO C.A.",
             date: "Jueves 26 de Diciembre de 2013",
-            status: "TUI90 Demo v0.0.1",
+            status: "G90TUI Demo v0.0.1",
             help: "Alt-F1: Ayuda",
             menus: &self.menus,
             active: self.active,
@@ -209,13 +209,13 @@ fn main() -> io::Result<()> {
     let res = run();
     leave_screen()?;
     if res.is_ok() {
-        println!("Sesión terminada. ¡Gracias por probar 90TUI!");
+        println!("Sesión terminada. ¡Gracias por probar G90TUI!");
     }
     res
 }
 
 fn run() -> io::Result<()> {
-    let mut shell = Shell::new(App::new(tui90::Theme::clipper())?);
+    let mut shell = Shell::new(App::new(g90tui::Theme::clipper())?);
     shell.paint();
     shell.app.present()?;
 

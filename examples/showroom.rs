@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
-use tui90::{
+use g90tui::{
     button_draw, button_width, check_key, draw_text, drive, dropdown_draw, dropdown_key,
     enter_screen, filedialog_draw, filedialog_key, fkey_bar_compact, folder, grid_draw, input_draw,
     input_key, leave_screen, list_key, listbox_draw, listbox_key, menubar_draw, msgbox_draw,
@@ -135,7 +135,7 @@ fn paint_charts(buf: &mut Buffer, area: Rect, t: Theme) {
     if area.is_empty() {
         return;
     }
-    let mut wo = WindowOpts::dialog("Gráficos 90TUI (F4 vuelve)", t);
+    let mut wo = WindowOpts::dialog("Gráficos G90TUI (F4 vuelve)", t);
     wo.controls = true;
     window(buf, area, &wo, t);
     let cw = area.w.saturating_sub(4) / 3; // 3 columnas
@@ -433,7 +433,7 @@ impl Show {
 
         let buf: &mut Buffer = self.screen.frame();
         buf.fill_rect(bounds, Cell::blank(Color::DarkGrey));
-        top_bar(buf, "TUI90 Showroom", "12:00", t);
+        top_bar(buf, "G90TUI Showroom", "12:00", t);
         menubar_draw(
             buf,
             Rect::new(0, 1, bounds.w, 1),
@@ -564,7 +564,7 @@ impl Show {
             // Diálogo central: todos los controles (dropdown se pinta al final,
             // para que su overlay quede encima).
             let d = lay.dialog;
-            let mut wo = WindowOpts::dialog("Showroom 90TUI", t);
+            let mut wo = WindowOpts::dialog("Showroom G90TUI", t);
             wo.controls = true;
             window(buf, d, &wo, t);
             let base = t.dialog_attr();
@@ -641,7 +641,7 @@ impl Show {
 
                 // Radios A (izq) y lista con scrollbar (der).
                 for (i, label) in RADIO_A.iter().enumerate() {
-                    tui90::radio_draw(
+                    g90tui::radio_draw(
                         buf,
                         lx,
                         d.y + 7 + i as u16,
@@ -682,7 +682,7 @@ impl Show {
 
                 // Radios B (der, bajo la lista) y casillas (izq).
                 for (i, label) in RADIO_B.iter().enumerate() {
-                    tui90::radio_draw(
+                    g90tui::radio_draw(
                         buf,
                         rx,
                         d.y + 11 + i as u16,
@@ -702,7 +702,7 @@ impl Show {
                     );
                 }
                 for (i, c) in checks.iter().enumerate() {
-                    tui90::checkbox_draw(
+                    g90tui::checkbox_draw(
                         buf,
                         lx,
                         d.y + 11 + i as u16,
@@ -723,7 +723,7 @@ impl Show {
 
                 // Progreso (izq, fila 15) con etiqueta de % dentro.
                 draw_text(buf, lx, d.y + 14, "Copia:", label_attr);
-                let mut pbar = tui90::ProgressBar::new(self.progress_pct);
+                let mut pbar = g90tui::ProgressBar::new(self.progress_pct);
                 pbar.foreground_color = t.teal;
                 progressbar_draw(buf, Rect::new(lx + 8, d.y + 14, 22, 1), &pbar);
                 if focus == 9 {
@@ -946,20 +946,20 @@ impl Show {
                     // `handle_event` nativo (↑↓ alteran selected + scroll).
                     let vis = 10usize;
                     match self.grid.handle_event(&EventCtx::new(vis), code) {
-                        tui90::GridNav::Move(i) => {
+                        g90tui::GridNav::Move(i) => {
                             if let Some(row) = self.grid.rows.get(i) {
                                 self.message = format!("Ítem: {} {}.", row[0], row[1]);
                             }
                         }
-                        tui90::GridNav::Stay => {}
+                        g90tui::GridNav::Stay => {}
                     }
                 } else {
                     let vis = 8usize; // alto del listbox en el diálogo
                     match listbox_key(&mut self.listbox, vis, code) {
-                        tui90::ListNav::Move(i) => {
+                        g90tui::ListNav::Move(i) => {
                             self.message = format!("Archivo: {}.", self.listbox.items[i]);
                         }
-                        tui90::ListNav::Stay => {}
+                        g90tui::ListNav::Stay => {}
                     }
                 }
             }
@@ -1009,12 +1009,12 @@ impl Show {
                     self.message = format!("Pestañas: {:?}.", self.tabs.position);
                 } else {
                     match tab_key(&mut self.tabs, code) {
-                        tui90::TabNav::Move(i) => {
+                        g90tui::TabNav::Move(i) => {
                             self.fm.set_active(self.tabs.active_scope());
                             self.focus = self.fm.current().unwrap_or(self.focus);
                             self.message = format!("Página: {}.", self.tabs.tabs[i].label);
                         }
-                        tui90::TabNav::Stay => {}
+                        g90tui::TabNav::Stay => {}
                     }
                 }
             }

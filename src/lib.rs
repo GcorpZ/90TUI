@@ -1,4 +1,4 @@
-//! 90TUI (`tui90`) — gTUI artesanal de los 90 al estilo de la técnica CA-Clipper para Rust.
+//! G90TUI (`g90tui`) — gTUI artesanal de los 90 al estilo de la técnica CA-Clipper para Rust.
 //!
 //! Licencia dual: MIT OR Apache-2.0. Ver `LICENSE-MIT` y `LICENSE-APACHE`.
 //!
@@ -14,7 +14,7 @@ pub mod core;
 pub mod prim;
 pub mod widgets;
 
-// Re-exports para `use tui90::Buffer;` directo.
+// Re-exports para `use g90tui::Buffer;` directo.
 pub use app::{
     centered as app_centered, desktop as app_desktop, draw_fkeys, map_key, map_key_event,
     match_fkey, menu_title_x, poll_event, popup as app_popup, test_app, to_crossterm, App,

@@ -1,4 +1,4 @@
-# 90TUI — FASE 2: Partes de la librería (guía pedagógica)
+# G90TUI — FASE 2: Partes de la librería (guía pedagógica)
 
 > Para alguien que nunca construyó un framework TUI. De lo general a lo particular, con analogía DOS.
 
@@ -7,10 +7,10 @@ disco = tu código, RAM = `Buffer`, tarjeta VGA = `Backend`, DOS = `App`, progra
 
 ## 1. ¿Qué es una librería Rust? (crate)
 
-* Un crate-lib es una caja de herramientas: expones funciones/structs vía `lib.rs`, otros la usan con `cargo add tui90`.
+* Un crate-lib es una caja de herramientas: expones funciones/structs vía `lib.rs`, otros la usan con `cargo add g90tui`.
 * Estructura:
 ```
-90TUI/
+G90TUI/
   Cargo.toml          # nombre, versión, deps (crossterm)
   src/lib.rs          # fachada: `pub mod core, prim, widgets, app;`
   src/core/*.rs       # piezas pequeñas (cada archivo = una responsabilidad)
@@ -21,7 +21,7 @@ disco = tu código, RAM = `Buffer`, tarjeta VGA = `Backend`, DOS = `App`, progra
   tests/*.rs          # pruebas
   docs/*.md           # lo que estás leyendo
 ```
-* Regla: un archivo = una idea (ej `rect.rs` solo sabe de rectángulos). `lib.rs` re-exporta para que el usuario haga `use tui90::popup_menu;` sin perderse.
+* Regla: un archivo = una idea (ej `rect.rs` solo sabe de rectángulos). `lib.rs` re-exporta para que el usuario haga `use g90tui::popup_menu;` sin perderse.
 
 ## 2. Mapa de partes (qué hace cada una y por qué existe)
 

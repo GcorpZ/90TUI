@@ -6,21 +6,24 @@ use std::time::Duration;
 
 use crossterm::event::{KeyCode as C, KeyModifiers as M};
 
-use tui90::app::{poll_event, test_app};
-use tui90::{
+use g90tui::app::{poll_event, test_app};
+use g90tui::{
     app_desktop, map_key, menu_title_x, AppKey, DesktopLayout, FKeyDef, Focus, Layer, MenuDef,
     Rect, Theme,
 };
 
 #[test]
 fn key_mapping_covers_arrows_f_and_alt() {
-    assert_eq!(map_key(C::Up, M::empty()), tui90::AppEvent::key(AppKey::Up));
+    assert_eq!(
+        map_key(C::Up, M::empty()),
+        g90tui::AppEvent::key(AppKey::Up)
+    );
     assert_eq!(
         map_key(C::F(1), M::empty()),
-        tui90::AppEvent::key(AppKey::F(1))
+        g90tui::AppEvent::key(AppKey::F(1))
     );
     let alt = map_key(C::Char('f'), M::ALT);
-    assert!(matches!(alt, tui90::AppEvent::Key { alt: true, .. }));
+    assert!(matches!(alt, g90tui::AppEvent::Key { alt: true, .. }));
 }
 
 #[test]
@@ -58,7 +61,7 @@ fn app_shell_flow_with_fkeys() {
         MenuDef::new("Varios", &["B"]),
     ];
     let fkeys = vec![FKeyDef::new("F2", "Grabar"), FKeyDef::new("Esc", "Salir")];
-    app.paint_shell(&tui90::ShellContent {
+    app.paint_shell(&g90tui::ShellContent {
         company: "E",
         date: "D",
         status: "S",
@@ -70,6 +73,6 @@ fn app_shell_flow_with_fkeys() {
     app.present().unwrap();
     assert!(!app.backend.take().is_empty());
     // F2 dispara el botón 0, Esc el botón 1.
-    assert_eq!(tui90::match_fkey(&fkeys, AppKey::F(2)), Some(0));
-    assert_eq!(tui90::match_fkey(&fkeys, AppKey::Esc), Some(1));
+    assert_eq!(g90tui::match_fkey(&fkeys, AppKey::F(2)), Some(0));
+    assert_eq!(g90tui::match_fkey(&fkeys, AppKey::Esc), Some(1));
 }

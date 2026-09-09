@@ -331,7 +331,7 @@ mod tests {
 
     fn sandbox(name: &str) -> PathBuf {
         let mut p = std::env::temp_dir();
-        p.push(format!("tui90_fdlg_{}_{}", name, std::process::id()));
+        p.push(format!("g90tui_fdlg_{}_{}", name, std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(p.join("sub")).unwrap();
         std::fs::write(p.join("a.txt"), b"a").unwrap();
@@ -379,7 +379,7 @@ mod tests {
     #[test]
     fn missing_dir_reports_error_without_panic() {
         let mut p = std::env::temp_dir();
-        p.push(format!("tui90_fdlg_noexiste_{}", std::process::id()));
+        p.push(format!("g90tui_fdlg_noexiste_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         let dlg = FileDialog::new(&p);
         assert!(dlg.error.is_some());

@@ -3,7 +3,7 @@
 //! Composición real sobre `Buffer`: ventana + sombra + botón + hotlabel,
 //! como un popup de menú de la época.
 
-use tui90::{
+use g90tui::{
     button, draw_hot_label, hsep, status_bar, top_bar, window, Buffer, Color, Rect, Theme,
     WindowOpts,
 };
@@ -15,8 +15,8 @@ fn popup_like_composition() {
 
     // Popup azul con sombra.
     let r = Rect::new(50, 2, 26, 10);
-    tui90::shadow(&mut b, r, t);
-    b.fill_rect(r, tui90::Cell::new(' ', t.popup_text, t.popup));
+    g90tui::shadow(&mut b, r, t);
+    b.fill_rect(r, g90tui::Cell::new(' ', t.popup_text, t.popup));
 
     // Items con hotkeys amarillas.
     let items = ["&Respaldo de datos", "Rec&uperar datos", "&Ordenar índices"];
@@ -27,7 +27,7 @@ fn popup_like_composition() {
     hsep(&mut b, 6, 51, 74, t.popup_text, t.popup);
     b.fill_rect(
         Rect::new(51, 4, 24, 1),
-        tui90::Cell::new(' ', t.select_fg, t.select_bg),
+        g90tui::Cell::new(' ', t.select_fg, t.select_bg),
     );
     draw_hot_label(&mut b, 52, 4, items[1], t.popup_sel_attr(), t.hot_attr());
 
@@ -66,7 +66,7 @@ fn shell_bars_and_work_area() {
     let t = Theme::clipper();
     let mut b = Buffer::blank(80, 25, Color::White);
     top_bar(&mut b, "EMPRESA DEMO", "FECHA", t);
-    status_bar(&mut b, "TUI90 Demo", "Ayuda", t);
+    status_bar(&mut b, "G90TUI Demo", "Ayuda", t);
     assert_eq!(b.get(0, 0).unwrap().bg, t.navy);
     assert_eq!(b.get(0, 24).unwrap().bg, t.navy);
     assert_eq!(b.get(1, 12).unwrap().bg, Color::White);

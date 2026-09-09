@@ -1,7 +1,7 @@
-# 90TUI — Catálogo de controles y elementos
+# G90TUI — Catálogo de controles y elementos
 
 > **Esta es la lista completa de lo que la librería pone a disposición
-> del programador.** Todo es `pub` desde la raíz (`use tui90::...`).
+> del programador.** Todo es `pub` desde la raíz (`use g90tui::...`).
 > Detalle fino de cada firma: `cargo doc --open` (rustdoc sale de los
 > comentarios del código). Demos copiables en `examples/`.
 
@@ -18,7 +18,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 `TextArea`, `Hyperlink`, `TuiChart`, `TabControl`, `GridTable`,
 `CalendarPicker` y `MsgBox` (vía `Buttons` + botones de 1 fila).
 
-## prim — primitivas de dibujo (`tui90::prim`)
+## prim — primitivas de dibujo (`g90tui::prim`)
 
 | Función | Parámetros | Devuelve | Efecto |
 |---|---|---|---|
@@ -41,7 +41,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `drive(buf, x, y, letra, attr, accent)` | `char` | `u16`=4 | `[C:]` |
 | `win_close / win_min(buf, x, y, ...)` | — | `u16`=3 | `[■]` / `[-]` de título |
 
-## widgets — controles de una llamada (`tui90::widgets`)
+## widgets — controles de una llamada (`g90tui::widgets`)
 
 | Función | Parámetros clave | Navegación (`*_key`) |
 |---|---|---|
@@ -80,7 +80,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `calendar_draw(buf, rect, cal)` | `CalendarPicker::new/current()` (matemática civil propia) | cuadrícula 7 col L–D, selección invertida; `calendar_key` (flechas/PgUp/PgDn/`Enter`) |
 | `popup_size(items)` | — | `(w, h)` para layout manual |
 
-## app — shell (`tui90::app`)
+## app — shell (`g90tui::app`)
 
 | Elemento | Uso |
 |---|---|
@@ -93,7 +93,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `desktop(screen)` → `{top, menu, work, fkeys, status}` | layout responsive |
 | `FKeyDef::new(tecla, etiqueta)` + `match_fkey(defs, key)` | c) qué hace cada función |
 
-## Núcleo (`tui90::core`, para avanzados)
+## Núcleo (`g90tui::core`, para avanzados)
 
 `Buffer` (`text/fill/hline/blit/snapshot/diff`), `Rect`
 (`intersect/clamp_in/centered_in/popup_at`), `Screen`

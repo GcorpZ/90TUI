@@ -5,7 +5,7 @@
 
 use crossterm::event::KeyCode;
 
-use tui90::{
+use g90tui::{
     confirm_draw, confirm_key, menubar_draw, menubar_key, popup_draw, popup_key, popup_layout,
     progress_draw, BarInfo, Buffer, Cell, DialogKey, MenuBarKey, MenuDef, PopupItem, PopupKey,
     ProgressInfo, Rect, Screen, Theme,

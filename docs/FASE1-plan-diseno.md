@@ -1,11 +1,11 @@
-# 90TUI — FASE 1: Plan de Diseño
+# G90TUI — FASE 1: Plan de Diseño
 
-> Rama docs: `90tui-docs` | Objetivo: mejor alternativa a Ratatui para exigentes, con el alma de la gTUI de gestión de los 90.
+> Rama docs: `g90tui-docs` | Objetivo: mejor alternativa a Ratatui para exigentes, con el alma de la gTUI de gestión de los 90.
 
 ## 1. Visión
 
 Ratatui es excelente pero "se siente TUI": box-drawing por todos lados, alto contraste, hay que hacer malabares para un menú desplegable decente.
-**90TUI = gTUI artesanal de los 90, reencarnada en Rust seguro:**
+**G90TUI = gTUI artesanal de los 90, reencarnada en Rust seguro:**
 llamas `menu_bar()`, `popup()`, `form()`, `browse()` y la pantalla queda como la gestión Clipper de principios de los 90: pastel, sombreada, responsive, con pila de pantallas y hotkeys amarillas automáticas.
 
 Lema: `Una función = un control completo en pantalla.`
@@ -61,7 +61,7 @@ Loop: `poll → update → render_diff → present`. Resize re-layout automátic
 
 ```rust
 // Shell
-90tui::app::App::new(Theme::clipper())?.run(|scr| demo(scr))?;
+g90tui::app::App::new(Theme::clipper())?.run(|scr| demo(scr))?;
 
 // Una llamada = control responsive
 menu_bar(scr, &["Archivos","Transacciones","Reportes","Varios"], 3)?;
@@ -70,7 +70,7 @@ confirm(scr, "¿ Está conforme ?", &["Si","No"])?; // botones teal + sombra
 input_form(scr, "DEPARTAMENTOS", &[Field::text("Código"), Field::text("Descripción")])?;
 browse_table(scr, headers, rows)?; // estilo tabla de inventario de la época
 dual_progress(scr, "ORDENAR INDICES", &Progress{file:"APROD.DAT", pct:12, cur:60, total:546})?;
-status_bar(scr, "TUI90 Demo v0.0.1", "Alt-F1: Ayuda")?;
+status_bar(scr, "G90TUI Demo v0.0.1", "Alt-F1: Ayuda")?;
 fkey_bar(scr, &[("F2","Grabar"),("Esc","Salir")])?;
 ```
 
@@ -86,11 +86,11 @@ fkey_bar(scr, &[("F2","Grabar"),("Esc","Salir")])?;
 ## 7. Ejemplo canónico (la promesa)
 
 ```rust
-use tui90 as tui;
+use g90tui as tui;
 fn main() -> anyhow::Result<()> {
     let mut app = tui::App::new(tui::Theme::clipper())?;
     app.top_bar("EMPRESA DEMO C.A.", "Jueves 26 de Diciembre de 2013")?;
-    app.status("TUI90 Demo v0.0.1", "Alt-F1: Ayuda")?;
+    app.status("G90TUI Demo v0.0.1", "Alt-F1: Ayuda")?;
     let menus = vec![
         ("Archivos", vec!["Proveedores","Departamentos","Depósitos"]),
         ("Varios", vec!["Estado del sistema","Respaldo de datos","Ordenar índices","Finalizar"]),

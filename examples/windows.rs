@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
-use tui90::{
+use g90tui::{
     button, draw_text, enter_screen, leave_screen, status_bar, top_bar, window, Attr, Backend,
     Buffer, Cell, Color, CrosstermBackend, Rect, Screen, Theme, WindowOpts,
 };
@@ -42,7 +42,7 @@ fn paint(s: &mut Screen) {
         "Jueves 26 de Diciembre de 2013",
         t,
     );
-    status_bar(buf, "TUI90 Demo v0.0.1", "Alt-F1: Ayuda", t);
+    status_bar(buf, "G90TUI Demo v0.0.1", "Alt-F1: Ayuda", t);
 
     // Menubar teal fila 1 con un item activo.
     if bounds.h > 2 {

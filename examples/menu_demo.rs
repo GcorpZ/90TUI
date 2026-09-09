@@ -1,6 +1,6 @@
 //! Ejemplo `menu_demo`: menubar + popup navegables con teclado (Fase 5).
 //!
-//! La promesa central de 90TUI: un menú con sub-opciones en pocas líneas,
+//! La promesa central de G90TUI: un menú con sub-opciones en pocas líneas,
 //! dibujado responsive y con hotkeys amarillas automáticas.
 //!
 //! Teclas: ←→ menús · ↓/Enter abrir · ↑↓ moverse · letra = hotkey ·
@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
-use tui90::{
+use g90tui::{
     draw_text, enter_screen, fkey_bar, leave_screen, menubar_draw, menubar_key, popup_draw,
     popup_key, popup_layout, status_bar, top_bar, Attr, Backend, Buffer, Cell, Color,
     CrosstermBackend, MenuBarKey, MenuDef, PopupItem, PopupKey, Rect, Screen, Theme,
@@ -108,7 +108,7 @@ impl Demo {
             "Jueves 26 de Diciembre de 2013",
             t,
         );
-        status_bar(buf, "TUI90 Demo v0.0.1", "Alt-F1: Ayuda", t);
+        status_bar(buf, "G90TUI Demo v0.0.1", "Alt-F1: Ayuda", t);
         if bounds.h > 3 {
             fkey_bar(
                 buf,

@@ -1,4 +1,4 @@
-//! Núcleo 90TUI: VRAM virtual (doble buffer + pila + tema + backend).
+//! Núcleo G90TUI: VRAM virtual (doble buffer + pila + tema + backend).
 //!
 //! Capas superiores (`prim`, `widgets`, `app` en Fases 4-6) solo usan
 //! `Buffer`, `Rect`, `Screen`, `Theme` y el trait `Backend`.

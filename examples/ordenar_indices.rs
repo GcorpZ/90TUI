@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
-use tui90::{
+use g90tui::{
     draw_text, enter_screen, leave_screen, list_draw, progress_draw, status_bar, top_bar, window,
     Backend, BarInfo, Buffer, CrosstermBackend, ProgressInfo, Rect, Screen, Theme, WindowOpts,
 };
@@ -31,14 +31,14 @@ fn paint(s: &mut Screen) {
     let t = s.theme;
     let bounds = s.bounds();
     let buf: &mut Buffer = s.frame();
-    buf.fill_rect(bounds, tui90::Cell::blank(t.desktop));
+    buf.fill_rect(bounds, g90tui::Cell::blank(t.desktop));
     top_bar(
         buf,
         "EMPRESA DEMO C.A.",
         "Jueves 26 de Diciembre de 2013",
         t,
     );
-    status_bar(buf, "TUI90 Demo v0.0.1", "Alt-F1: Ayuda", t);
+    status_bar(buf, "G90TUI Demo v0.0.1", "Alt-F1: Ayuda", t);
 
     // Modal gris con lista (selección azul en "Proveedores").
     let modal = Rect::centered_in(48, 16, bounds);
@@ -51,7 +51,7 @@ fn paint(s: &mut Screen) {
         modal.x + 3,
         modal.y + modal.h - 2,
         "F2 Todos   ↑↓ elegir   Enter ordenar",
-        tui90::Attr::new(tui90::Color::Black, t.window_bg),
+        g90tui::Attr::new(g90tui::Color::Black, t.window_bg),
     );
 
     // Progreso doble encima (tercer nivel apilado).
