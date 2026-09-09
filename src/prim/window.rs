@@ -74,7 +74,7 @@ pub struct WindowOpts {
     /// 1 celda macizo del borde; con `Single`/`Double` tiñe los glifos
     /// del marco (`None` = tinta del cuerpo). `Bevel3D` lo ignora.
     pub border_color: Option<Color>,
-    /// Estilo de marco perimetral (los presets usan `Double`).
+    /// Estilo de marco perimetral (los presets usan `Single`).
     pub border_style: BorderStyle,
     /// Pinta caja de cierre `[■]` (`\u{25a0}`) incrustada en el borde
     /// superior: ocupa `x+1, x+2, x+3` relativos a la esquina.
@@ -104,7 +104,7 @@ impl WindowOpts {
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
             border_color: None,
-            border_style: BorderStyle::Double,
+            border_style: BorderStyle::Single,
             controls: false,
         }
     }
@@ -121,7 +121,7 @@ impl WindowOpts {
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
             border_color: None,
-            border_style: BorderStyle::Double,
+            border_style: BorderStyle::Single,
             controls: false,
         }
     }
@@ -138,7 +138,7 @@ impl WindowOpts {
             shadow: true,
             shadow_style: ShadowStyle::Translucent,
             border_color: None,
-            border_style: BorderStyle::Double,
+            border_style: BorderStyle::Single,
             controls: false,
         }
     }
@@ -301,11 +301,11 @@ mod tests {
         let mut b = Buffer::blank(40, 15, t.desktop);
         let r = Rect::new(5, 3, 30, 9);
         window(&mut b, r, &WindowOpts::modal("ORDENAR", t), t);
-        // Modal = caja doble: esquinas CP437 (arriba sobre teal).
-        assert_eq!(b.get(5, 3).unwrap().ch, '\u{2554}'); // ╔
-        assert_eq!(b.get(5 + 30 - 1, 3).unwrap().ch, '\u{2557}'); // ╗
-        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().ch, '\u{255a}'); // ╚
-        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().ch, '\u{255d}'); // ╝
+        // Modal = caja simple por defecto: esquinas CP437 (arriba sobre teal).
+        assert_eq!(b.get(5, 3).unwrap().ch, '\u{250c}'); // ┌
+        assert_eq!(b.get(5 + 30 - 1, 3).unwrap().ch, '\u{2510}'); // ┐
+        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().ch, '\u{2514}'); // └
+        assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().ch, '\u{2518}'); // ┘
         assert_eq!(b.get(5, 3).unwrap().bg, t.teal);
         // Título centrado e incrustado en el marco (misma x que en plano).
         assert_eq!(b.get(5 + (30 - 7) / 2, 3).unwrap().ch, 'O');
@@ -352,14 +352,14 @@ mod tests {
         let mut bordered = WindowOpts::modal("B", t);
         bordered.border_color = Some(Color::Red);
         window(&mut b, r, &bordered, t);
-        assert_eq!(b.get(5, 3).unwrap().ch, '\u{2554}');
+        assert_eq!(b.get(5, 3).unwrap().ch, '\u{250c}');
         assert_eq!(b.get(5, 3).unwrap().fg, Color::Red);
         assert_eq!(b.get(5, 3).unwrap().bg, t.teal);
         assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().fg, Color::Red);
         assert_eq!(b.get(5 + 30 - 1, 3 + 9 - 1).unwrap().bg, Color::Grey);
-        // Sin borde por defecto: la esquina es glifo doble sobre el cuerpo.
+        // Sin borde por defecto: la esquina es glifo simple sobre el cuerpo.
         window(&mut b, r, &WindowOpts::modal("B", t), t);
-        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().ch, '\u{255a}');
+        assert_eq!(b.get(5, 3 + 9 - 1).unwrap().ch, '\u{2514}');
         assert_eq!(b.get(5, 3 + 9 - 1).unwrap().bg, Color::Grey);
     }
 
@@ -394,11 +394,11 @@ mod tests {
     }
 
     #[test]
-    fn presets_default_to_double() {
+    fn presets_default_to_single() {
         let t = Theme::clipper();
-        assert_eq!(WindowOpts::modal("M", t).border_style, BorderStyle::Double);
-        assert_eq!(WindowOpts::form("F", t).border_style, BorderStyle::Double);
-        assert_eq!(WindowOpts::dialog("D", t).border_style, BorderStyle::Double);
+        assert_eq!(WindowOpts::modal("M", t).border_style, BorderStyle::Single);
+        assert_eq!(WindowOpts::form("F", t).border_style, BorderStyle::Single);
+        assert_eq!(WindowOpts::dialog("D", t).border_style, BorderStyle::Single);
         assert_eq!(BorderStyle::default(), BorderStyle::None);
     }
 }
