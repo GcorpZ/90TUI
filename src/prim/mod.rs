@@ -5,6 +5,7 @@
 
 pub mod button;
 pub mod icons;
+pub mod icons20;
 pub mod label;
 pub mod scrollbar;
 pub mod separator;
@@ -17,6 +18,7 @@ pub use button::{
     BUTTON_MIN_WIDTH,
 };
 pub use icons::{drive, folder, win_close, win_min, FolderGlyphs};
+pub use icons20::{drive_badge, file_badge, fkey_badge, folder_badge, DriveType, IconMode};
 pub use label::{
     base_on, draw_hot_label, draw_text, fit_text, hot_key_of, parse_hotkey, visible_len, HotAttrs,
 };

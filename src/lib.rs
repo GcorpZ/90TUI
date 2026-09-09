@@ -26,9 +26,10 @@ pub use core::{
 };
 pub use prim::{
     button, button_draw, button_draw_ex, button_draw_opts, button_ex, button_width, darken_color,
-    draw_hot_label, draw_text, drive, fit_text, folder, hot_key_of, hsep, parse_hotkey, shadow,
-    shadow_offset, shadow_solid, shadow_stipple, shadow_styled, status_bar, top_bar, visible_len,
-    vscrollbar, win_close, win_min, window, BorderStyle, ButtonOpts, FolderGlyphs, HotAttrs,
+    draw_hot_label, draw_text, drive, drive_badge, file_badge, fit_text, fkey_badge, folder,
+    folder_badge, hot_key_of, hsep, parse_hotkey, shadow, shadow_offset, shadow_solid,
+    shadow_stipple, shadow_styled, status_bar, top_bar, visible_len, vscrollbar, win_close,
+    win_min, window, BorderStyle, ButtonOpts, DriveType, FolderGlyphs, HotAttrs, IconMode,
     ShadowStyle, WindowOpts, BUTTON_MIN_WIDTH,
 };
 pub use widgets::{

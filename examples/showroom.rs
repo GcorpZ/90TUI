@@ -24,16 +24,16 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
 use g90tui::{
     button_draw, button_width, calendar_draw, calendar_field_width, calendar_key_mod, check_key,
-    draw_text, drive, dropdown_draw, dropdown_key, enter_screen, filedialog_draw, filedialog_key,
-    fkey_bar_compact, folder, grid_draw, input_draw, input_key, leave_screen, list_key,
-    listbox_draw, listbox_key, menubar_draw, msgbox_draw, msgbox_key, progressbar_draw, radio_key,
-    statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar, tuichart_draw, vscrollbar,
-    window, Alignment, Attr, Backend, Buffer, Buttons, CalNav, CalendarPicker, Cell, ChartKind,
-    ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend, Dropdown, DropdownKey,
-    EventCtx, FKeyDef, FKeyStyle, FileDialog, FileDialogKey, FocusManager, FolderGlyphs, GlyphSet,
-    GridTable, HandleEvent, HotAttrs, InputField, InputKey, ListBox, MenuDef, MsgBoxKey, RadioNav,
-    Rect, Screen, StatusBar, TabControl, TabPosition, TableDef, TableState, Theme, TuiChart,
-    WindowOpts,
+    draw_text, drive_badge, dropdown_draw, dropdown_key, enter_screen, filedialog_draw,
+    filedialog_key, fkey_bar_compact, folder_badge, grid_draw, input_draw, input_key, leave_screen,
+    list_key, listbox_draw, listbox_key, menubar_draw, msgbox_draw, msgbox_key, progressbar_draw,
+    radio_key, statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar, tuichart_draw,
+    vscrollbar, window, Alignment, Attr, Backend, Buffer, Buttons, CalNav, CalendarPicker, Cell,
+    ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend, DriveType,
+    Dropdown, DropdownKey, EventCtx, FKeyDef, FKeyStyle, FileDialog, FileDialogKey, FocusManager,
+    GlyphSet, GridTable, HandleEvent, HotAttrs, IconMode, InputField, InputKey, ListBox, MenuDef,
+    MsgBoxKey, RadioNav, Rect, Screen, StatusBar, TabControl, TabPosition, TableDef, TableState,
+    Theme, TuiChart, WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder()`.
@@ -449,12 +449,16 @@ impl Show {
             t,
         );
 
-        // Fila de unidades con iconos `[A:]`.
+        // Fila de unidades con insignias `icons20` (A: floppy, C: disco, D: CD).
         let drv_attr = Attr::new(Color::Black, Color::DarkGrey);
         draw_text(buf, 2, 2, "ID = DEMO", drv_attr);
         let mut dx = 14u16;
-        for drv in ['A', 'C', 'D'] {
-            dx += drive(buf, dx, 2, drv, drv_attr, Color::Yellow) + 1;
+        for (drv, dt) in [
+            ('A', DriveType::Floppy35),
+            ('C', DriveType::HardDisk),
+            ('D', DriveType::CdRom),
+        ] {
+            dx += drive_badge(buf, dx, 2, drv, dt, IconMode::NerdFont, drv == 'C', t) + 1;
         }
 
         // Panel árbol con iconos de carpeta.
@@ -488,15 +492,7 @@ impl Show {
                 };
                 let mut cx = p.x + 2;
                 cx += draw_text(buf, cx, y, pre, pre_attr);
-                cx += folder(
-                    buf,
-                    cx,
-                    y,
-                    open,
-                    row_attr,
-                    Color::Yellow,
-                    FolderGlyphs::nerd(),
-                );
+                cx += folder_badge(buf, cx, y, open, IconMode::NerdFont, t);
                 draw_text(buf, cx + 1, y, name, row_attr);
             }
             vscrollbar(
