@@ -35,8 +35,12 @@ pub enum DriveType {
     CdRom,
 }
 
-/// Insignia de unidad con carcasa según hardware (`active` = fondo
-/// amarillo invertido). Devuelve el ancho dibujado (retro 6–7, NF 4).
+/// Insignia de unidad fiel a PC Tools 9 (`active` = selección amarilla
+/// con texto negro). Carcasa de hardware auténtica: floppy `[≡]`/`[═]`,
+/// disco `[▬-]` con LED verde de lectura, CD `[○]`; letra en blanco.
+/// En modo `NerdFont` solo el floppy usa glifo (`\u{f0a0}`); disco y CD
+/// conservan su carcasa física (sin glifos ambiguos).
+/// Devuelve el ancho dibujado (floppy 6/4, disco 7, CD 6).
 #[allow(clippy::too_many_arguments)] // firma del contrato icons20: contexto completo en una llamada
 pub fn drive_badge(
     buf: &mut Buffer,
@@ -49,63 +53,58 @@ pub fn drive_badge(
     theme: Theme,
 ) -> u16 {
     let up = letter.to_ascii_uppercase();
-    // Base: fondo escritorio; activa: amarillo invertido.
+    // Base: letra blanca sobre escritorio; activa: negro sobre amarillo.
     let (fg, bg) = if active {
         (Color::Black, Color::Yellow)
     } else {
-        (Color::Yellow, theme.desktop)
+        (Color::White, theme.desktop)
     };
     let base = Attr::new(fg, bg);
-    match mode {
-        IconMode::NerdFont => {
-            let g = match drive_type {
-                DriveType::Floppy35 | DriveType::Floppy525 => '\u{f0a0}',
-                DriveType::HardDisk => '\u{f1c0}',
-                DriveType::CdRom => '\u{f111}',
-            };
-            buf.set(x, y, Cell::with_attr(g, Attr::new(Color::Yellow, bg)));
-            buf.set(x.saturating_add(1), y, Cell::new(' ', fg, bg));
-            buf.set(x.saturating_add(2), y, Cell::with_attr(up, base));
-            buf.set(x.saturating_add(3), y, Cell::with_attr(':', base));
-            4
-        }
-        IconMode::RetroCp437 => {
-            // Carcasa física + letra (`A:`), LED verde en el disco duro.
-            let (mid, w) = match drive_type {
-                DriveType::Floppy35 => ('\u{2261}', 6),  // [≡]
-                DriveType::Floppy525 => ('\u{2550}', 6), // [═]
-                DriveType::HardDisk => ('\u{25a0}', 7),  // [■-]
-                DriveType::CdRom => ('\u{25cb}', 6),     // [○]
-            };
-            let chassis = Attr::new(if active { fg } else { Color::Grey }, bg);
-            buf.set(x, y, Cell::with_attr('[', chassis));
-            buf.set(x.saturating_add(1), y, Cell::with_attr(mid, chassis));
-            if drive_type == DriveType::HardDisk {
-                // LED verde junto al cuerpo (visible también en activo).
-                buf.set(
-                    x.saturating_add(2),
-                    y,
-                    Cell::with_attr('-', Attr::new(Color::Green, bg)),
-                );
-                buf.set(x.saturating_add(3), y, Cell::with_attr(']', chassis));
-                buf.set(x.saturating_add(4), y, Cell::new(' ', fg, bg));
-                buf.set(x.saturating_add(5), y, Cell::with_attr(up, base));
-                buf.set(x.saturating_add(6), y, Cell::with_attr(':', base));
-            } else {
-                buf.set(x.saturating_add(2), y, Cell::with_attr(']', chassis));
-                buf.set(x.saturating_add(3), y, Cell::new(' ', fg, bg));
-                buf.set(x.saturating_add(4), y, Cell::with_attr(up, base));
-                buf.set(x.saturating_add(5), y, Cell::with_attr(':', base));
-            }
-            w
-        }
+    if mode == IconMode::NerdFont && !matches!(drive_type, DriveType::HardDisk | DriveType::CdRom) {
+        buf.set(
+            x,
+            y,
+            Cell::with_attr('\u{f0a0}', Attr::new(Color::Yellow, bg)),
+        );
+        buf.set(x.saturating_add(1), y, Cell::new(' ', fg, bg));
+        buf.set(x.saturating_add(2), y, Cell::with_attr(up, base));
+        buf.set(x.saturating_add(3), y, Cell::with_attr(':', base));
+        return 4;
     }
+    // Carcasa física + letra (`A:`), LED verde en el disco duro.
+    let (mid, body, w) = match drive_type {
+        DriveType::Floppy35 => ('\u{2261}', Color::Grey, 6), // [≡]
+        DriveType::Floppy525 => ('\u{2550}', Color::Grey, 6), // [═]
+        DriveType::HardDisk => ('\u{25ac}', Color::White, 7), // [▬-]
+        DriveType::CdRom => ('\u{25cb}', Color::Grey, 6),    // [○]
+    };
+    let chassis = Attr::new(if active { fg } else { body }, bg);
+    buf.set(x, y, Cell::with_attr('[', chassis));
+    buf.set(x.saturating_add(1), y, Cell::with_attr(mid, chassis));
+    if drive_type == DriveType::HardDisk {
+        // LED verde junto al cuerpo (visible también en activo).
+        buf.set(
+            x.saturating_add(2),
+            y,
+            Cell::with_attr('-', Attr::new(Color::Green, bg)),
+        );
+        buf.set(x.saturating_add(3), y, Cell::with_attr(']', chassis));
+        buf.set(x.saturating_add(4), y, Cell::new(' ', fg, bg));
+        buf.set(x.saturating_add(5), y, Cell::with_attr(up, base));
+        buf.set(x.saturating_add(6), y, Cell::with_attr(':', base));
+    } else {
+        buf.set(x.saturating_add(2), y, Cell::with_attr(']', chassis));
+        buf.set(x.saturating_add(3), y, Cell::new(' ', fg, bg));
+        buf.set(x.saturating_add(4), y, Cell::with_attr(up, base));
+        buf.set(x.saturating_add(5), y, Cell::with_attr(':', base));
+    }
+    w
 }
 
 /// Tecla de función estilo Norton / CUA 1993 para la status bar:
-/// número (`1`..`10`, sin `F`) en amarillo brillante sobre navy +
-/// acción en gris claro sobre navy + 2 celdas de aire. Sin bloques
-/// amarillos: toda la barra respira sobre el mismo navy.
+/// `F{n}` en amarillo brillante + negrita sobre navy, acción en blanco
+/// sobre navy, + 2 espacios de aire entre comandos. Sin bloques: toda
+/// la barra respira sobre el mismo navy.
 /// Devuelve el ancho dibujado (incluido el aire).
 pub fn fkey_badge(
     buf: &mut Buffer,
@@ -115,15 +114,14 @@ pub fn fkey_badge(
     action: &str,
     theme: Theme,
 ) -> u16 {
-    let num = format!("{key_num}");
     let num_a = Attr::bold(Color::Yellow, theme.navy);
-    let act_a = Attr::new(Color::Grey, theme.navy);
+    let act_a = Attr::new(Color::White, theme.navy);
     let mut cx = x;
-    for ch in num.chars() {
+    for ch in format!("F{key_num} ").chars() {
         buf.set(cx, y, Cell::with_attr(ch, num_a));
         cx = cx.saturating_add(1);
     }
-    for ch in format!(" {action}  ").chars() {
+    for ch in format!("{action}  ").chars() {
         buf.set(cx, y, Cell::with_attr(ch, act_a));
         cx = cx.saturating_add(1);
     }
@@ -205,27 +203,18 @@ pub fn folder_badge(
 /// Icono de archivo según extensión sobre el `bg` del llamante, con
 /// reserva estricta de 2 celdas (glifo + espacio obligatorio): la
 /// columna del nombre arranca en `x + 2` y ninguna fuente lo pisa.
-/// Ejecutables (`exe/com/bat`) `*` verde (NF `\u{f489}` prompt),
-/// datos (`dbf/dat/ntx`) `≡` cian, documentos (`txt/doc`) `≡` blanco,
-/// resto `·` gris. Devuelve 2.
-pub fn file_badge(buf: &mut Buffer, x: u16, y: u16, name: &str, mode: IconMode, bg: Color) -> u16 {
+/// Indicadores sobrios de la época, iguales en ambos modos (sin glifos
+/// ajenos): ejecutables (`exe/com/bat`) `*` verde, datos (`dbf/dat/ntx`)
+/// `≡` cian, documentos (`txt/doc`) `·` gris, resto `·` gris. Devuelve 2.
+pub fn file_badge(buf: &mut Buffer, x: u16, y: u16, name: &str, _mode: IconMode, bg: Color) -> u16 {
     let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
-    let kind = match ext.as_str() {
-        "exe" | "com" | "bat" => 0,
-        "dbf" | "dat" | "ntx" => 1,
-        "txt" | "doc" => 2,
-        _ => 3,
+    let (g, fg) = match ext.as_str() {
+        "exe" | "com" | "bat" => ('*', Color::Green),
+        "dbf" | "dat" | "ntx" => ('\u{2261}', Color::Cyan),
+        "txt" | "doc" => ('\u{b7}', Color::Grey),
+        _ => ('\u{b7}', Color::Grey),
     };
-    let (retro, nf, fg) = match kind {
-        0 => ('*', '\u{f489}', Color::Green),
-        1 => ('\u{2261}', '\u{f0ce}', Color::Cyan),
-        2 => ('\u{2261}', '\u{f0f6}', Color::White),
-        _ => ('\u{b7}', '\u{f016}', Color::Grey),
-    };
-    let g = match mode {
-        IconMode::NerdFont => nf,
-        IconMode::RetroCp437 => retro,
-    };
+    // Sobrio universal: el mismo glifo en ambos modos.
     buf.set(x, y, Cell::with_attr(g, Attr::new(fg, bg)));
     buf.set(x.saturating_add(1), y, Cell::new(' ', fg, bg));
     2
@@ -257,8 +246,9 @@ mod tests {
         assert_eq!(b.get(2, 1).unwrap().ch, '[');
         assert_eq!(b.get(3, 1).unwrap().ch, '\u{2261}');
         assert_eq!(b.get(6, 1).unwrap().ch, 'A');
+        assert_eq!(b.get(6, 1).unwrap().fg, Color::White);
         assert_eq!(b.get(7, 1).unwrap().ch, ':');
-        // Disco duro con LED verde y ancho 7.
+        // Disco duro `[▬-]` con LED verde y ancho 7.
         let w2 = drive_badge(
             &mut b,
             2,
@@ -270,9 +260,10 @@ mod tests {
             t,
         );
         assert_eq!(w2, 7);
-        assert_eq!(b.get(3, 2).unwrap().ch, '\u{25a0}');
+        assert_eq!(b.get(3, 2).unwrap().ch, '\u{25ac}');
         assert_eq!(b.get(4, 2).unwrap().ch, '-');
         assert_eq!(b.get(4, 2).unwrap().fg, Color::Green);
+        assert_eq!(b.get(7, 2).unwrap().ch, 'C');
         // Activa: fondo amarillo invertido.
         drive_badge(
             &mut b,
@@ -289,9 +280,10 @@ mod tests {
     }
 
     #[test]
-    fn drive_nerdfont_draws_glyphs() {
+    fn drive_nerdfont_floppy_glyph_and_hd_carcass() {
         let t = theme();
         let mut b = Buffer::blank(30, 4, t.desktop);
+        // HD en NF también viste carcasa física (sin glifos ambiguos).
         let w = drive_badge(
             &mut b,
             2,
@@ -302,13 +294,15 @@ mod tests {
             false,
             t,
         );
-        assert_eq!(w, 4);
-        assert_eq!(b.get(2, 1).unwrap().ch, '\u{f1c0}');
-        assert_eq!(b.get(3, 1).unwrap().ch, ' ');
-        assert_eq!(b.get(4, 1).unwrap().ch, 'C');
+        assert_eq!(w, 7);
+        assert_eq!(b.get(2, 1).unwrap().ch, '[');
+        assert_eq!(b.get(3, 1).unwrap().ch, '\u{25ac}');
+        assert_eq!(b.get(4, 1).unwrap().fg, Color::Green);
+        assert_eq!(b.get(7, 1).unwrap().ch, 'C');
+        assert_eq!(b.get(7, 1).unwrap().fg, Color::White);
         let w2 = drive_badge(
             &mut b,
-            8,
+            12,
             1,
             'a',
             DriveType::Floppy35,
@@ -317,32 +311,39 @@ mod tests {
             t,
         );
         assert_eq!(w2, 4);
-        assert_eq!(b.get(8, 1).unwrap().ch, '\u{f0a0}');
+        assert_eq!(b.get(12, 1).unwrap().ch, '\u{f0a0}');
     }
 
     #[test]
     fn fkey_badge_is_norton_style() {
         let t = theme();
-        let mut b = Buffer::blank(30, 4, t.desktop);
-        // `1 Help` + 2 de aire = 1 + 5 + 2.
+        let mut b = Buffer::blank(40, 4, t.desktop);
+        // `F1 Help` + 2 de aire: 3 + 4 + 2.
         let w = fkey_badge(&mut b, 2, 1, 1, "Help", t);
-        assert_eq!(w, 1 + 1 + 4 + 2);
-        // Número amarillo brillante sobre navy, sin letra F.
-        assert_eq!(b.get(2, 1).unwrap().ch, '1');
+        assert_eq!(w, 3 + 4 + 2);
+        // Tecla amarilla brillante + negrita sobre navy, con prefijo F.
+        assert_eq!(b.get(2, 1).unwrap().ch, 'F');
+        assert_eq!(b.get(3, 1).unwrap().ch, '1');
         assert_eq!(b.get(2, 1).unwrap().bg, t.navy);
         assert_eq!(b.get(2, 1).unwrap().fg, Color::Yellow);
         assert!(b.get(2, 1).unwrap().bold);
-        // Acción en gris claro sobre navy.
-        assert_eq!(b.get(4, 1).unwrap().ch, 'H');
-        assert_eq!(b.get(4, 1).unwrap().bg, t.navy);
-        assert_eq!(b.get(4, 1).unwrap().fg, Color::Grey);
-        // Aire final también navy (barra limpia).
-        assert_eq!(b.get(9, 1).unwrap().bg, t.navy);
-        // Dos dígitos (`10`) sin F.
-        let w2 = fkey_badge(&mut b, 12, 1, 10, "Menu", t);
-        assert_eq!(w2, 2 + 1 + 4 + 2);
-        assert_eq!(b.get(12, 1).unwrap().ch, '1');
-        assert_eq!(b.get(13, 1).unwrap().ch, '0');
+        // Acción en blanco sobre navy.
+        assert_eq!(b.get(5, 1).unwrap().ch, 'H');
+        assert_eq!(b.get(5, 1).unwrap().bg, t.navy);
+        assert_eq!(b.get(5, 1).unwrap().fg, Color::White);
+        // Aire final también navy (barra limpia): `F1 Help··`.
+        assert_eq!(b.get(8, 1).unwrap().ch, 'p');
+        assert_eq!(b.get(9, 1).unwrap().ch, ' ');
+        assert_eq!(b.get(10, 1).unwrap().ch, ' ');
+        assert_eq!(b.get(10, 1).unwrap().bg, t.navy);
+        // Ancho exacto: la celda 11 queda intacta (fondo escritorio).
+        assert_eq!(b.get(11, 1).unwrap().bg, t.desktop);
+        // Dos dígitos (`F10 Menu`): 4 + 4 + 2.
+        let w2 = fkey_badge(&mut b, 14, 1, 10, "Menu", t);
+        assert_eq!(w2, 4 + 4 + 2);
+        assert_eq!(b.get(14, 1).unwrap().ch, 'F');
+        assert_eq!(b.get(15, 1).unwrap().ch, '1');
+        assert_eq!(b.get(16, 1).unwrap().ch, '0');
     }
 
     #[test]
@@ -440,18 +441,21 @@ mod tests {
             file_badge(&mut b, 8, 3, "LEEME.TXT", IconMode::RetroCp437, t.window_bg),
             2
         );
-        assert_eq!(b.get(8, 3).unwrap().fg, Color::White);
+        assert_eq!(b.get(8, 3).unwrap().ch, '\u{b7}');
+        assert_eq!(b.get(8, 3).unwrap().fg, Color::Grey);
         assert_eq!(
             file_badge(&mut b, 8, 4, "RARO.XYZ", IconMode::RetroCp437, t.window_bg),
             2
         );
         assert_eq!(b.get(8, 4).unwrap().fg, Color::Grey);
-        // NF sin engranajes: prompt clásico para ejecutables.
+        // Sobrio universal: el ejecutable también es `*` en NF.
         assert_eq!(
             file_badge(&mut b, 12, 1, "PARK.COM", IconMode::NerdFont, t.window_bg),
             2
         );
-        assert_eq!(b.get(12, 1).unwrap().ch, '\u{f489}');
+        assert_eq!(b.get(12, 1).unwrap().ch, '*');
+        assert_eq!(b.get(12, 1).unwrap().fg, Color::Green);
+        assert_eq!(b.get(13, 1).unwrap().ch, ' ');
     }
 
     #[test]
@@ -472,7 +476,7 @@ mod tests {
             ),
             7
         );
-        assert_eq!(fkey_badge(&mut b, 9, 0, 10, "Menu", t), 2 + 1 + 4 + 2);
+        assert_eq!(fkey_badge(&mut b, 9, 0, 10, "Menu", t), 4 + 4 + 2);
         assert_eq!(
             folder_badge(
                 &mut b,

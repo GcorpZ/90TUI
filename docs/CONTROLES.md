@@ -40,7 +40,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `folder(buf, x, y, open, attr, accent, glyphs)` | `FolderGlyphs::{nerd, ascii}` | `u16`=1 | U+F07B/U+F07C o ASCII |
 | `drive(buf, x, y, letra, attr, accent)` | `char` | `u16`=4 | `[C:]` |
 | `win_close / win_min(buf, x, y, ...)` | — | `u16`=3 | `[■]` / `[-]` de título |
-| `icons20::{drive_badge, folder_badge, file_badge, fkey_badge}` (`IconMode::{RetroCp437, NerdFont}`) | `DriveType::{Floppy35, Floppy525, HardDisk, CdRom}`, activo; `bg` del llamante | `u16`=1–7 | carcasas `[≡]/[■-]/[○]` o NF `U+F0A0/F1C0`, `[+]/[-]` sin parches, `*`/`≡` + aire (nombre en x+2), `N acción` Norton sin `F` |
+| `icons20::{drive_badge, folder_badge, file_badge, fkey_badge}` (`IconMode::{RetroCp437, NerdFont}`) | `DriveType::{Floppy35, Floppy525, HardDisk, CdRom}`, activo; `bg` del llamante | `u16`=1–7 | carcasas `[≡]/[═]/[▬-]/[○]` (NF solo floppy `U+F0A0`), `[+]/[-]` sin parches, `*`/`≡`/`·` + aire (nombre en x+2), `F1 Help` Norton + 2 aire |
 | `icons20::{win_close, win_zoom, win_min}` / `win_resize_grip` | `attr`, `accent` | `u16`=3 / 1 | `[■]` `[▲]` `[▼]` / `◢` |
 
 ## widgets — controles de una llamada (`g90tui::widgets`)

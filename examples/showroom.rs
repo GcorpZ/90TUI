@@ -487,9 +487,9 @@ impl Show {
                 };
                 let mut cx = p.x + 2;
                 cx += draw_text(buf, cx, y, pre, pre_attr);
-                // El badge hereda el fondo de la fila: azul en selección,
-                // gris fuera (sin parches).
-                let dir_bg = if selected { t.select_bg } else { t.window_bg };
+                // El badge hereda el fondo REAL de la fila (azul popup en
+                // selección, gris fuera): barra continua, icono visible.
+                let dir_bg = if selected { t.popup } else { t.window_bg };
                 cx += folder_badge(buf, cx, y, open, IconMode::NerdFont, Color::Yellow, dir_bg);
                 draw_text(buf, cx + 1, y, name, row_attr);
             }
