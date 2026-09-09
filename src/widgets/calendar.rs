@@ -2,11 +2,13 @@
 //!
 //! * **Cerrado:** 1 fila con máscara ` [ DD/MM/AAAA ] [ <icono> ]`
 //!   (icono Nerd Font `\u{f073}`). `Enter`/`Espacio` abre el popup.
+//!   La máscara la elige el programador (`datemask`: `YYYY`/`YY`/`MM`/`M`/
+//!   `DD`/`D`, resto literal); sin ella, estándar `DD/MM/AAAA`.
 //! * **Abierto:** overlay de 23×10 con caja CP437 de doble línea,
-//!   cabecera `«◄ MES AAAA ►»`, semana `Lu..Do` y cursor Clipper en el
-//!   día. Flechas mueven días, `PgUp`/`PgDn` meses,
-//!   `Shift`/`Ctrl`+`PgUp`/`PgDn` años, `Enter` acepta y cierra,
-//!   `Esc` restaura y cierra.
+//!   cabecera `«◄ MES AAAA ►»`, semana `Lu..Do`, cursor Clipper en el
+//!   día y **hoy en negrita roja** (`today_fg`). Flechas mueven días,
+//!   `PgUp`/`PgDn` meses, `Shift`/`Ctrl`+`PgUp`/`PgDn` años,
+//!   `Enter` acepta y cierra, `Esc` restaura y cierra.
 //! * Matemática civil propia (Hinnant), sin dependencias: días julianos
 //!   ↔ calendario + bisiestos.
 //! * Expone los 4 parámetros globales (`foreground_color`,
@@ -34,8 +36,6 @@ const MONTHS: [&str; 12] = [
 
 /// Icono del campo contraído (Nerd Font, calendario).
 const CAL_ICON: char = '\u{f073}';
-/// Ancho de la fila contraída: ` [ DD/MM/AAAA ] [ X ]`.
-const FIELD_W: u16 = 21;
 /// Tamaño fijo del popup: caja + cabecera + semana + 6 filas + caja.
 const POPUP_W: u16 = 23;
 const POPUP_H: u16 = 10;
@@ -54,6 +54,45 @@ const HDR_PREV_YEAR: char = '\u{ab}'; // «
 const HDR_PREV_MONTH: char = '\u{25c4}'; // ◄
 const HDR_NEXT_MONTH: char = '\u{25ba}'; // ►
 const HDR_NEXT_YEAR: char = '\u{bb}'; // »
+
+/// Máscara estándar cuando `datemask` es `None`.
+pub const DEFAULT_DATEMASK: &str = "DD/MM/YYYY";
+
+/// Expande una máscara de fecha (`YYYY`/`YY`/`MM`/`M`/`DD`/`D`,
+/// resto literal) sin dependencias.
+pub fn apply_datemask(mask: &str, y: i32, m: u8, d: u8) -> String {
+    const TOKENS: [&str; 6] = ["YYYY", "YY", "MM", "DD", "M", "D"];
+    let mut out = String::new();
+    let mut i = 0;
+    while i < mask.len() {
+        let rest = &mask[i..];
+        if let Some(tok) = TOKENS.iter().find(|t| rest.starts_with(*t)) {
+            match *tok {
+                "YYYY" => out.push_str(&format!("{y:04}")),
+                "YY" => out.push_str(&format!("{:02}", y.rem_euclid(100))),
+                "MM" => out.push_str(&format!("{m:02}")),
+                "M" => out.push_str(&format!("{m}")),
+                "DD" => out.push_str(&format!("{d:02}")),
+                _ => out.push_str(&format!("{d}")),
+            }
+            i += tok.len();
+        } else {
+            let ch = rest.chars().next().unwrap_or('?');
+            out.push(ch);
+            i += ch.len_utf8();
+        }
+    }
+    out
+}
+
+/// Fecha de hoy del sistema como `(año, mes, día)`.
+fn today_ymd() -> (i32, u8, u8) {
+    let days = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() / 86400)
+        .unwrap_or(0) as i64;
+    civil_from_days(days)
+}
 
 /// Días desde 1970-01-01 (puede ser negativo).
 pub fn days_from_civil(y: i32, m: u8, d: u8) -> i64 {
@@ -117,6 +156,10 @@ pub struct CalendarPicker {
     pub header_fg: Color,
     pub selected_fg: Color,
     pub selected_bg: Color,
+    /// Tinta del día de hoy (siempre en negrita).
+    pub today_fg: Color,
+    /// Máscara del campo (`YYYY`/`YY`/`MM`/`M`/`DD`/`D`); `None` = estándar.
+    pub datemask: Option<String>,
     pub border_color: Option<Color>,
     pub has_shadow: bool,
     /// Valor confirmado al abrir (para restaurar con `Esc`).
@@ -135,6 +178,8 @@ impl CalendarPicker {
             header_fg: Color::White,
             selected_fg: Color::White,
             selected_bg: Color::Navy,
+            today_fg: Color::Red,
+            datemask: None,
             border_color: None,
             has_shadow: true,
             saved: (year, month.clamp(1, 12), day.max(1)),
@@ -146,17 +191,14 @@ impl CalendarPicker {
 
     /// Mes actual del sistema (vía `SystemTime`, sin dependencias).
     pub fn current() -> Self {
-        let days = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs() / 86400)
-            .unwrap_or(0) as i64;
-        let (y, m, d) = civil_from_days(days);
+        let (y, m, d) = today_ymd();
         Self::new(y, m, d)
     }
 
-    /// Fecha confirmada con formato de máscara `DD/MM/AAAA`.
+    /// Fecha confirmada según `datemask` (o estándar `DD/MM/AAAA`).
     pub fn formatted(&self) -> String {
-        format!("{:02}/{:02}/{:04}", self.day, self.month, self.year)
+        let mask = self.datemask.as_deref().unwrap_or(DEFAULT_DATEMASK);
+        apply_datemask(mask, self.year, self.month, self.day)
     }
 
     /// Abre el popup (guarda el valor para un posible `Esc`).
@@ -195,9 +237,9 @@ impl CalendarPicker {
     }
 }
 
-/// Ancho de la fila contraída (1 fila de alto).
-pub fn calendar_field_width() -> u16 {
-    FIELD_W
+/// Ancho de la fila contraída (1 fila de alto): ` [ fecha ] [ X ]`.
+pub fn calendar_field_width(cal: &CalendarPicker) -> u16 {
+    cal.formatted().chars().count() as u16 + 11
 }
 
 /// Rect del popup abierto: debajo del campo si cabe, si no encima.
@@ -223,10 +265,7 @@ pub fn calendar_draw(buf: &mut Buffer, rect: Rect, cal: &CalendarPicker) {
         Rect::new(rect.x, rect.y, rect.w, 1),
         Cell::new(' ', cal.foreground_color, cal.background_color),
     );
-    let line = format!(
-        " [ {:02}/{:02}/{:04} ] [ {} ]",
-        cal.day, cal.month, cal.year, CAL_ICON
-    );
+    let line = format!(" [ {} ] [ {} ]", cal.formatted(), CAL_ICON);
     draw_text(buf, rect.x, rect.y, &fit_text(&line, rect.w), base);
     if !cal.is_open {
         return;
@@ -306,20 +345,37 @@ pub fn calendar_draw(buf: &mut Buffer, rect: Rect, cal: &CalendarPicker) {
     );
     let first = weekday(cal.year, cal.month, 1);
     let ndays = days_in_month(cal.year, cal.month);
+    let (ty, tm, td) = today_ymd();
     for day in 1..=ndays {
-        let pos = first as usize + (day - 1) as usize;
-        let (col, row) = (pos % 7, pos / 7);
-        let x = pop.x.saturating_add(1).saturating_add(col as u16 * 3);
-        let y = pop.y.saturating_add(3).saturating_add(row as u16);
+        let (x, y) = day_xy(pop, first, day);
         let sel = day == cal.day;
+        let is_today = cal.year == ty && cal.month == tm && day == td;
+        // El cursor manda; si no, hoy va en negrita roja.
         let (fg, bg) = if sel {
             (cal.selected_fg, cal.selected_bg)
+        } else if is_today {
+            (cal.today_fg, cal.background_color)
         } else {
             (cal.foreground_color, cal.background_color)
         };
+        let a = Attr::new(fg, bg);
+        let a = if !sel && is_today {
+            Attr::bold(fg, bg)
+        } else {
+            a
+        };
         buf.fill_rect(Rect::new(x, y, 3, 1), Cell::new(' ', fg, bg));
-        draw_text(buf, x, y, &format!("{day:2}"), Attr::new(fg, bg));
+        draw_text(buf, x, y, &format!("{day:2}"), a);
     }
+}
+
+/// Celda (x, y) del día dentro del popup (celdas de 3).
+fn day_xy(pop: Rect, first: u8, day: u8) -> (u16, u16) {
+    let pos = first as usize + (day - 1) as usize;
+    (
+        pop.x.saturating_add(1).saturating_add((pos % 7) as u16 * 3),
+        pop.y.saturating_add(3).saturating_add((pos / 7) as u16),
+    )
 }
 
 /// Navegación pura.
@@ -489,6 +545,64 @@ mod tests {
         assert_eq!(calendar_key(&mut d, KeyCode::Esc), CalNav::Cancelled);
         assert!(!d.is_open);
         assert_eq!((d.year, d.month, d.day), (2026, 9, 15));
+    }
+
+    #[test]
+    fn today_is_bold_red_and_selection_wins() {
+        let t = Theme::clipper();
+        let (ty, tm, td) = today_ymd();
+        // Selección distinta de hoy para ver ambos resaltados.
+        let sel = if td > 1 { td - 1 } else { td + 1 };
+        let mut c = CalendarPicker::new(ty, tm, sel);
+        calendar_key(&mut c, KeyCode::Enter);
+        let mut b = Buffer::blank(40, 16, t.desktop);
+        let r = Rect::new(2, 1, 21, 1);
+        calendar_draw(&mut b, r, &c);
+        let pop = calendar_popup_rect(r, Rect::new(0, 0, 40, 16));
+        let first = weekday(ty, tm, 1);
+        // Hoy: tinta roja + negrita (sin ser el cursor).
+        let (tx, ty_) = day_xy(pop, first, td);
+        let today_cell = b.get(tx, ty_).unwrap();
+        assert_eq!(today_cell.fg, Color::Red);
+        assert!(today_cell.bold);
+        // El cursor Clipper manda sobre el rojo de hoy.
+        let (sx, sy) = day_xy(pop, first, sel);
+        assert_eq!(b.get(sx, sy).unwrap().bg, c.selected_bg);
+        // Y si hoy ES la selección, el cursor gana.
+        let mut c2 = CalendarPicker::new(ty, tm, td);
+        calendar_key(&mut c2, KeyCode::Enter);
+        calendar_draw(&mut b, r, &c2);
+        assert_eq!(b.get(tx, ty_).unwrap().bg, c2.selected_bg);
+    }
+
+    #[test]
+    fn datemask_formats_and_sizes_field() {
+        let mut c = CalendarPicker::new(2026, 9, 8);
+        // Estándar por defecto.
+        assert_eq!(c.formatted(), "08/09/2026");
+        assert_eq!(calendar_field_width(&c), 21);
+        // ISO con literal intacto.
+        c.datemask = Some("YYYY-MM-DD".into());
+        assert_eq!(c.formatted(), "2026-09-08");
+        assert_eq!(calendar_field_width(&c), 21);
+        // Sin relleno + año corto.
+        c.datemask = Some("M/D/YY".into());
+        assert_eq!(c.formatted(), "9/8/26");
+        assert_eq!(calendar_field_width(&c), 6 + 11);
+        // Texto con minúsculas no se toca (tokens en mayúsculas).
+        c.datemask = Some("Fecha: DD.MM.YYYY".into());
+        assert_eq!(c.formatted(), "Fecha: 08.09.2026");
+        // Helper público directo.
+        assert_eq!(apply_datemask("DD/MM/YYYY", 2026, 9, 8), "08/09/2026");
+        // El campo dibuja la máscara custom.
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(40, 6, t.desktop);
+        c.datemask = Some("YYYY-MM-DD".into());
+        calendar_draw(&mut b, Rect::new(2, 1, calendar_field_width(&c), 1), &c);
+        assert_eq!(b.get(5, 1).unwrap().ch, '2');
+        assert_eq!(b.get(8, 1).unwrap().ch, '6');
+        assert_eq!(b.get(9, 1).unwrap().ch, '-');
+        assert_eq!(b.get(11, 1).unwrap().ch, '9');
     }
 
     #[test]

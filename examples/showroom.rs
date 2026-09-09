@@ -586,7 +586,12 @@ impl Show {
             let rx = vp.x.saturating_add(vp.w / 2).saturating_add(1);
             let label_attr = Attr::new(Color::Black, t.dialog);
             let dd_rect = Rect::new(lx.saturating_add(8), d.y + 2, 20, 1);
-            let cal_rect = Rect::new(lx.saturating_add(8), d.y + 6, calendar_field_width(), 1);
+            let cal_rect = Rect::new(
+                lx.saturating_add(8),
+                d.y + 6,
+                calendar_field_width(&self.cal),
+                1,
+            );
             if focus == 11 {
                 let (mx, my) = if self.tabs.position == TabPosition::Left {
                     (tab_box.x, tab_box.y + 1 + self.tabs.active as u16)
