@@ -59,7 +59,7 @@ pub use menubar::{menubar_draw, menubar_key, MenuBarKey, MenuDef, MenuItem};
 pub use msgbox::{msgbox_draw, msgbox_key, msgbox_layout, msgbox_wrap, Buttons, MsgBoxKey};
 pub use popup::{popup_draw, popup_key, popup_layout, popup_size, PopupItem, PopupKey};
 pub use progress::{bar_fill_width, progress_draw, BarInfo, ProgressInfo};
-pub use progressbar::{progress_fill, progressbar_draw, ProgressBar};
+pub use progressbar::{progress_eighths, progress_fill, progressbar_draw, ProgressBar, SUB_BLOCKS};
 pub use statusbar::{
     fkey_bar, fkey_bar_compact, fkey_bar_stacked, fkey_bar_styled, statusbar_draw, Alignment,
     FKeyStyle, StatusBar, StatusColumn,

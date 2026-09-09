@@ -9,15 +9,16 @@
 //!
 //! Foco con Tab: árbol → archivos → dropdown → nombre → clave → fecha →
 //! radios A → radios B → casillas → lista → progreso → botones. Flechas
-//! mueven, Espacio alterna/elige, Enter acepta, Esc sale. En progreso:
-//! `←→` ajusta ±5. En fecha: `PgUp/PgDn` mes, `Shift`+`PgUp/PgDn` año.
+//! mueven, Espacio alterna/elige, Enter acepta, Esc sale. La copia avanza
+//! sola en ciclo 0-100 (octavos visibles); en progreso `←→` ajusta ±5 a
+//! mano. En fecha: `PgUp/PgDn` mes, `Shift`+`PgUp/PgDn` año.
 //!
 //! ```sh
 //! cargo run --example showroom
 //! ```
 
 use std::io::{self, stdout};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
@@ -796,6 +797,15 @@ impl Show {
         }
     }
 
+    /// Avance automático de la demo: +2 cada tick, al 100% reinicia a 0.
+    fn tick_progress(&mut self) {
+        self.progress_pct = if self.progress_pct >= 100 {
+            0
+        } else {
+            self.progress_pct.saturating_add(2).min(100)
+        };
+    }
+
     /// Devuelve `false` para salir.
     fn key(&mut self, code: KeyCode, mods: KeyModifiers) -> bool {
         // Modal de archivos: captura todo (Esc cancela, Enter acepta).
@@ -1084,6 +1094,9 @@ fn run() -> io::Result<()> {
     let mut be = CrosstermBackend::new(stdout());
     show.paint();
     be.present(&show.screen.present_ops())?;
+    // La barra de progreso avanza sola (+2 cada 150ms, ciclo 0-100) para
+    // ver los octavos en movimiento; las flechas la ajustan a mano.
+    let mut last_tick = Instant::now();
 
     loop {
         if event::poll(Duration::from_millis(100))? {
@@ -1112,6 +1125,12 @@ fn run() -> io::Result<()> {
                 }
                 _ => {}
             }
+        }
+        if last_tick.elapsed() >= Duration::from_millis(150) {
+            last_tick = Instant::now();
+            show.tick_progress();
+            show.paint();
+            be.present(&show.screen.present_ops())?;
         }
     }
     Ok(())

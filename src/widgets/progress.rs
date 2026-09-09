@@ -1,8 +1,10 @@
-//! Progreso con barras dobles: diálogo menta + track gris + fill azul.
+//! Progreso con barras dobles: diálogo menta + `ProgressBar` real.
 //!
 //! Cada barra ocupa 3 filas: `0 ... 100 %` / barra / `etiqueta  cur/total`.
+//! La fila 2 la pinta `progressbar_draw` (octavos de bloque + `NN%`).
 
-use crate::core::{Buffer, Cell, Rect, Theme};
+use super::progressbar::{progressbar_draw, ProgressBar};
+use crate::core::{Buffer, Rect, Theme};
 use crate::prim::{draw_text, visible_len, window, WindowOpts};
 
 /// Una barra de avance.
@@ -92,24 +94,11 @@ pub fn progress_draw(buf: &mut Buffer, screen: Rect, info: &ProgressInfo, theme:
             pct_s,
             theme.dialog_attr(),
         );
-        // Fila 2: track + fill + pct centrado encima.
-        let fill = bar_fill_width(inner_w, bar.pct);
-        for x in 0..inner_w {
-            let c = if x < fill {
-                Cell::new(' ', theme.popup_text, theme.popup)
-            } else {
-                Cell::new(' ', theme.dialog_text, theme.field_bg)
-            };
-            buf.set(inner_x.saturating_add(x), base + 1, c);
-        }
-        let mid = format!("{}%", bar.pct);
-        draw_text(
-            buf,
-            inner_x.saturating_add(inner_w.saturating_sub(visible_len(&mid)) / 2),
-            base + 1,
-            &mid,
-            theme.dialog_attr(),
-        );
+        // Fila 2: un `ProgressBar` real (octavos + `NN%` integrado).
+        let mut pbar = ProgressBar::new(bar.pct);
+        pbar.foreground_color = theme.popup;
+        pbar.background_color = theme.field_bg;
+        progressbar_draw(buf, Rect::new(inner_x, base + 1, inner_w, 1), &pbar);
         // Fila 3: `Etiqueta: ARCHIVO   cur/total`.
         let desc = format!("{}: {}", bar.label, bar.file);
         draw_text(buf, inner_x, base + 2, &desc, theme.dialog_attr());
@@ -150,22 +139,15 @@ mod tests {
             vec![BarInfo::new("Inventario", "APROD.DAT", 12, 60, 546)],
         );
         progress_draw(&mut buf, Rect::new(0, 0, 80, 25), &info, t);
-        // Hay al menos una celda azul (fill) y una gris (track).
-        let mut found_fill = false;
-        let mut found_track = false;
-        for x in 0..80 {
-            for y in 0..25 {
-                let bg = buf.get(x, y).unwrap().bg;
-                if bg == t.popup {
-                    found_fill = true;
-                }
-                if bg == t.field_bg {
-                    found_track = true;
-                }
-            }
-        }
-        assert!(found_fill && found_track);
-        // Contador visible en alguna fila.
+        // Diálogo 44×8 centrado: fila 2 en y=12, x=20..60.
+        // 12% de 40 = 38 octavos: 4 llenas + frontera ▊(6/8) + pista.
+        assert_eq!(buf.get(20, 12).unwrap().ch, '\u{2588}');
+        assert_eq!(buf.get(20, 12).unwrap().fg, t.popup);
+        assert_eq!(buf.get(24, 12).unwrap().ch, '\u{258a}');
+        assert_eq!(buf.get(25, 12).unwrap().ch, '\u{2591}');
+        // Porcentaje integrado + contador en sus filas.
+        let row12: String = (0..80).map(|x| buf.get(x, 12).unwrap().ch).collect();
+        assert!(row12.contains("12%"), "12% no encontrado");
         let found = (0..25).any(|y| {
             let row: String = (0..80).map(|x| buf.get(x, y).unwrap().ch).collect();
             row.contains("60/546")

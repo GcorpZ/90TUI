@@ -53,7 +53,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `list_draw(buf, rect, items, sel, centered, theme)` | `&[String]` | `list_key(sel, len, code, page)`; selección azul |
 | `confirm_layout(pregunta, botones, screen)` | — | `(Rect, Vec<Rect>)` botones |
 | `confirm_draw(buf, screen, título, pregunta, botones, sel, theme)` | `&[String]` | `confirm_key` → `Move/Accept/Cancel`; letra acepta |
-| `progress_draw(buf, screen, info, theme)` | `ProgressInfo{título, espacio, tiempo, bars}` | `BarInfo::new(etiqueta, archivo, pct, cur, total)`; `bar_fill_width` |
+| `progress_draw(buf, screen, info, theme)` | `ProgressInfo{título, espacio, tiempo, bars}` | `BarInfo::new(etiqueta, archivo, pct, cur, total)`; fila 2 = `ProgressBar` real; `bar_fill_width` (compat) |
 | `form_draw(buf, rect, título, state, theme)` | `FormState{fields, focus}` | `form_key` → `Moved/Accept/Cancel`; `Field::{text, number, yesno}` |
 | `table_draw(buf, rect, def, state, footer, theme)` | `TableDef{headers, rows}` | `table_key(state, n, visible, code)`; `TableState{row, top}` |
 | `checkbox_draw(buf, x, y, item, focused, style)` | `CheckItem{label, checked}` | `check_key` → `Move/Toggled`; Espacio/letra alterna |
@@ -61,7 +61,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `CheckStyle::new(attrs, GlyphSet::{modern, ascii})` | colores + glifos | integrales `☐/☑` `○/◉` o ASCII con marcos (+`border_color`, `has_shadow` fila) |
 | `dropdown_draw(buf, rect, dd, theme)` | `Dropdown{options, selected_index, is_open, label, max_height, bg/fg/active_bg, border_color, has_shadow}` | cerrado: selección + `▼`; abierto: overlay + scroll + `dropdown_key` (`↑↓` circular, `Enter` acepta, letra filtra) |
 | `input_draw(buf, rect, field, focused)` | `InputField{value, max_len, mask, cursor, fg/bg/active_bg, border_color, has_shadow}` | `input_key` → inserta/borra/mueve; máscara solo visual |
-| `progressbar_draw(buf, rect, bar)` | `ProgressBar{pct 0-100, fg/bg, border_color, has_shadow, show_pct}` | `█` `\u{2588}` / `░` `\u{2591}` + `NN%` si cabe |
+| `progressbar_draw(buf, rect, bar)` | `ProgressBar{pct 0-100, fg/bg, border_color, has_shadow, show_pct}` | octavos `SUB_BLOCKS` (8x) + frontera sin pisar por `NN%` + corchetes o caja simple |
 | `listbox_draw(buf, rect, lb)` | `ListBox{items, selected, top, fg/bg/highlight, border_color, has_shadow}` | scrollbar `▲`/`▼` + `█` proporcional; `listbox_key` (flechas/PgUp/PgDn/letra) |
 | `fkey_bar(buf, y, keys, theme)` | `&[(&str,&str)]` | 1 fila clásica |
 | `fkey_bar_styled(buf, y, keys, FKeyStyle)` | `FKeyStyle{key_fg/bg, label_fg/bg, has_shadow}` | a) cantidad b) etiquetas d/e) colores |
