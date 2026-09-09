@@ -22,6 +22,8 @@ pub use label::{
 };
 pub use scrollbar::vscrollbar;
 pub use separator::hsep;
-pub use shadow::{shadow, shadow_offset, shadow_solid, shadow_stipple, shadow_styled, ShadowStyle};
+pub use shadow::{
+    darken_color, shadow, shadow_offset, shadow_solid, shadow_stipple, shadow_styled, ShadowStyle,
+};
 pub use title::{status_bar, top_bar};
 pub use window::{window, WindowOpts};

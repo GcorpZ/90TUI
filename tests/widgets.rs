@@ -6,9 +6,9 @@
 use crossterm::event::KeyCode;
 
 use g90tui::{
-    confirm_draw, confirm_key, menubar_draw, menubar_key, popup_draw, popup_key, popup_layout,
-    progress_draw, BarInfo, Buffer, Cell, DialogKey, MenuBarKey, MenuDef, PopupItem, PopupKey,
-    ProgressInfo, Rect, Screen, Theme,
+    confirm_draw, confirm_key, darken_color, menubar_draw, menubar_key, popup_draw, popup_key,
+    popup_layout, progress_draw, BarInfo, Buffer, Cell, DialogKey, MenuBarKey, MenuDef, PopupItem,
+    PopupKey, ProgressInfo, Rect, Screen, Theme,
 };
 
 fn menus() -> Vec<MenuDef> {
@@ -55,7 +55,10 @@ fn popup_opens_under_active_menu() {
     assert_eq!(buf.get(r.x + 2, r.y + 1).unwrap().fg, t.hot);
     // Fila 1 seleccionada: barra gris.
     assert_eq!(buf.get(r.x + 1, r.y + 2).unwrap().bg, t.select_bg);
-    assert_eq!(buf.get(r.right(), r.y + 1).unwrap().bg, t.shadow);
+    assert_eq!(
+        buf.get(r.right(), r.y + 1).unwrap().bg,
+        darken_color(t.desktop, 0.40)
+    );
 }
 
 #[test]

@@ -199,6 +199,7 @@ pub fn popup_key(items: &[PopupItem], selected: usize, code: KeyCode) -> PopupKe
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prim::darken_color;
 
     fn items() -> Vec<PopupItem> {
         vec![
@@ -253,7 +254,9 @@ mod tests {
         assert_eq!(b.get(r.x + 1, r.y + 2).unwrap().bg, t.select_bg);
         // Hotkey amarilla del item 0.
         assert_eq!(b.get(r.x + 2, r.y + 1).unwrap().fg, t.hot);
-        // Sombra a la derecha.
-        assert_eq!(b.get(r.right(), r.y + 1).unwrap().bg, t.shadow);
+        // Sombra cromática a la derecha (oscurece el escritorio, no negro).
+        let sh = b.get(r.right(), r.y + 1).unwrap();
+        assert_eq!(sh.bg, darken_color(t.desktop, 0.40));
+        assert!(sh.dim);
     }
 }

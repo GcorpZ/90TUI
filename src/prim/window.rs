@@ -139,9 +139,10 @@ pub fn window(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, theme: Theme) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prim::darken_color;
 
     #[test]
-    fn modal_has_teal_title_grey_body_black_shadow() {
+    fn modal_has_teal_title_grey_body_chromatic_shadow() {
         let t = Theme::clipper();
         let mut b = Buffer::blank(40, 15, t.desktop);
         let r = Rect::new(5, 3, 30, 9);
@@ -151,8 +152,12 @@ mod tests {
         assert_eq!(b.get(6, 3).unwrap().bg, t.teal);
         // Cuerpo gris.
         assert_eq!(b.get(6, 5).unwrap().bg, Color::Grey);
-        // Sombra negra en (x+2, y+h) — primera fila bajo la ventana.
-        assert_eq!(b.get(7, 3 + 9).unwrap().bg, Color::Black);
+        // Sombra cromática en (x+2, y+h): el cian del escritorio baja a
+        // azul marino profundo, no a negro sólido.
+        let sh = b.get(7, 3 + 9).unwrap();
+        assert_eq!(sh.bg, darken_color(t.desktop, 0.40));
+        assert_ne!(sh.bg, Color::Black);
+        assert!(sh.dim);
     }
 
     #[test]

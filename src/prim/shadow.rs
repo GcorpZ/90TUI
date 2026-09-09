@@ -1,17 +1,19 @@
 //! Sombras estilo VGA/modo texto: translúcidas, tramadas o sólidas.
 //!
 //! El truco de la época (visible en las capturas de referencia) no era
-//! pintar un bloque negro opaco, sino **reutilizar la celda de fondo**:
-//! * **Translucent** (estilo PCTools/gestión): conserva el glifo y lo
-//!   aplasta a gris fantasma sobre negro — el contenido se adivina
-//!   debajo, y eso el ojo lo lee como "sombra" en vez de "barra".
+//! pintar un bloque negro opaco, sino **oscurecer lo que ya había**:
+//! * **Translucent** (estilo PCTools/gestión/Norton): conserva el glifo y
+//!   atenúa sus colores con `darken_color` (fg ×0.50, bg ×0.40) más `dim`
+//!   ANSI — el contenido se adivina debajo con su tinte original, y eso
+//!   el ojo lo lee como "sombra" en vez de "barra". El fondo negro sólido
+//!   (`theme.shadow`) solo queda para `Solid`/`Stipple`.
 //! * **Stipple** (estilo Turbo): tramado ajedrez 50%: una celda sí, una
 //!   no — el punteado clásico del IDE.
 //! * **Solid**: bloque opaco (botones de 1px, como el OK/Cancel).
 //!
 //! Se pinta PRIMERO (debajo) y el cuerpo encima.
 
-use crate::core::{Buffer, Cell, Rect, Theme};
+use crate::core::{Buffer, Cell, Color, Rect, Theme};
 
 /// Estilo de sombra.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -23,6 +25,42 @@ pub enum ShadowStyle {
     Stipple,
     /// Bloque opaco (botones).
     Solid,
+}
+
+/// Un paso de oscurecimiento sobre la paleta fija de 12 colores ANSI:
+/// brillantes → su equivalente oscuro; oscuros → el mínimo de su tinte
+/// (o negro si ya es mínimo); blanco/gris claro → gris oscuro.
+/// (Nota: el motor es ANSI-16 sin `Rgb`/`AnsiValue`, así que la
+/// atenuación es por tabla discreta en vez de multiplicar canales.)
+fn darken_step(c: Color) -> Color {
+    use Color::*;
+    match c {
+        Black => Black,
+        Navy => Black,
+        Blue => Navy,
+        Teal => Navy,
+        Cyan => Teal,
+        DarkGrey => Black,
+        Grey => DarkGrey,
+        White => Grey,
+        Yellow => Green,
+        Mint => Green,
+        Red => Black,
+        Green => Black,
+    }
+}
+
+/// Oscurecimiento cromático natural (estilo Norton/Clipper).
+/// `factor >= 0.5` baja 1 escalón, `< 0.5` baja 2; el negro es el suelo
+/// (nunca se sale de la paleta). El tinte se conserva siempre que la
+/// paleta tenga un escalón más profundo para él.
+pub fn darken_color(c: Color, factor: f32) -> Color {
+    let steps = if factor < 0.5 { 2 } else { 1 };
+    let mut out = c;
+    for _ in 0..steps {
+        out = darken_step(out);
+    }
+    out
 }
 
 /// Sombra clásica con offset (2, 1), estilo translúcido.
@@ -73,8 +111,8 @@ pub fn shadow_styled(
                 ShadowStyle::Solid => Cell::new(' ', theme.shadow, theme.shadow),
                 ShadowStyle::Translucent => Cell {
                     ch: old.ch,
-                    fg: old.fg,
-                    bg: theme.shadow,
+                    fg: darken_color(old.fg, 0.50),
+                    bg: darken_color(old.bg, 0.40),
                     bold: false,
                     dim: true,
                 },
@@ -108,14 +146,38 @@ mod tests {
         let mut b = Buffer::blank(10, 6, Color::White);
         b.text(3, 2, "AB", Color::Black, Color::White);
         shadow(&mut b, Rect::new(1, 1, 4, 2), t);
-        // La sombra cae en (3,2): glifo y color intactos, atenuados.
+        // La sombra cae en (3,2): glifo intacto, colores atenuados.
         let c = b.get(3, 2).unwrap();
         assert_eq!(c.ch, 'A');
-        assert_eq!(c.bg, t.shadow);
-        assert_eq!(c.fg, Color::Black);
+        // Oscurecimiento cromático, NO negro sólido.
+        assert_eq!(c.bg, darken_color(Color::White, 0.40));
+        assert_ne!(c.bg, t.shadow);
+        assert_eq!(c.fg, darken_color(Color::Black, 0.50));
+        assert!(!c.bold);
         assert!(c.dim);
         // El cuerpo original no se toca.
         assert_eq!(b.get(1, 1).unwrap().bg, Color::White);
+        // Cian brillante → tinte frío profundo, tampoco negro.
+        let mut b2 = Buffer::blank(10, 6, Color::Cyan);
+        shadow(&mut b2, Rect::new(1, 1, 4, 2), t);
+        let c2 = b2.get(3, 2).unwrap();
+        assert_eq!(c2.bg, darken_color(Color::Cyan, 0.40));
+        assert_ne!(c2.bg, t.shadow);
+    }
+
+    #[test]
+    fn darken_color_steps_bright_to_dark() {
+        // factor >= 0.5 = 1 escalón, < 0.5 = 2 escalones.
+        assert_eq!(darken_color(Color::White, 0.50), Color::Grey);
+        assert_eq!(darken_color(Color::White, 0.40), Color::DarkGrey);
+        assert_eq!(darken_color(Color::Cyan, 0.50), Color::Teal);
+        assert_eq!(darken_color(Color::Cyan, 0.40), Color::Navy);
+        assert_eq!(darken_color(Color::Blue, 0.50), Color::Navy);
+        assert_eq!(darken_color(Color::Yellow, 0.50), Color::Green);
+        // El negro es el suelo: nunca se sale de la paleta.
+        assert_eq!(darken_color(Color::Black, 0.40), Color::Black);
+        assert_eq!(darken_color(Color::Red, 0.50), Color::Black);
+        assert_eq!(darken_color(Color::Green, 0.40), Color::Black);
     }
 
     #[test]
@@ -152,7 +214,7 @@ mod tests {
         let t = Theme::clipper();
         let mut b = Buffer::blank(10, 6, Color::White);
         shadow(&mut b, Rect::new(7, 4, 5, 5), t); // sombra (9,5): solo 1 celda visible
-        assert_eq!(b.get(9, 5).unwrap().bg, t.shadow);
+        assert_eq!(b.get(9, 5).unwrap().bg, darken_color(Color::White, 0.40));
         assert_eq!(b.get(0, 0).unwrap().bg, Color::White);
     }
 }
