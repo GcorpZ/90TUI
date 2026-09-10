@@ -32,8 +32,8 @@ use g90tui::{
     ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend, DriveType,
     Dropdown, DropdownKey, EventCtx, FKeyDef, FileDialog, FileDialogKey, FocusManager, GlyphSet,
     GridTable, HandleEvent, HotAttrs, IconMode, InputField, InputKey, ListBox, MenuDef, MsgBoxKey,
-    RadioNav, Rect, Screen, StatusBar, TabControl, TabPosition, TableDef, TableState, Theme,
-    TuiChart, WindowOpts,
+    RadioNav, Rect, Screen, ShadowStyle, StatusBar, TabControl, TabPosition, TableDef, TableState,
+    Theme, TuiChart, WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder_badge()`.
@@ -434,7 +434,9 @@ impl Show {
         let files_vis = lay.file_panel.h.saturating_sub(3).max(1) as usize;
 
         let buf: &mut Buffer = self.screen.frame();
-        buf.fill_rect(bounds, Cell::blank(Color::DarkGrey));
+        // Escritorio del tema (cian Clipper): las sombras translúcidas lo
+        // atenúan a marino en vez de crear bloques negros.
+        buf.fill_rect(bounds, Cell::blank(t.desktop));
         top_bar(buf, "G90TUI Showroom", "12:00", t);
         menubar_draw(
             buf,
@@ -445,7 +447,7 @@ impl Show {
         );
 
         // Fila de unidades con insignias `icons20` (A: floppy, C: disco, D: CD).
-        let drv_attr = Attr::new(Color::Black, Color::DarkGrey);
+        let drv_attr = Attr::new(Color::Black, t.desktop);
         draw_text(buf, 2, 2, "ID = DEMO", drv_attr);
         let mut dx = 14u16;
         for (drv, dt) in [
@@ -461,6 +463,9 @@ impl Show {
             let p = lay.tree_panel;
             let mut wo = WindowOpts::modal("ID = DEMO", t);
             wo.controls = true;
+            // Sombra cromática translúcida como el diálogo central: el
+            // escritorio se atenúa (cian→marino), sin bloques negros.
+            wo.shadow_style = ShadowStyle::Translucent;
             window(buf, p, &wo, t);
             let vis = tree_vis;
             for i in 0..vis {

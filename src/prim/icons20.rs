@@ -36,11 +36,12 @@ pub enum DriveType {
 }
 
 /// Insignia de unidad fiel a PC Tools 9 (`active` = selección amarilla
-/// con texto negro). Carcasa de hardware auténtica: floppy `[≡]`/`[═]`,
-/// disco `[▬-]` con LED verde de lectura, CD `[○]`; letra en blanco.
-/// En modo `NerdFont` solo el floppy usa glifo (`\u{f0a0}`); disco y CD
-/// conservan su carcasa física (sin glifos ambiguos).
-/// Devuelve el ancho dibujado (floppy 6/4, disco 7, CD 6).
+/// con texto negro, uniforme en todo el badge). Dos estéticas coherentes:
+/// retro = carcasa de hardware para todas (`[≡]`/`[═]` floppy,
+/// `[▬-]` disco con LED verde, `[○]` CD, letra en blanco);
+/// NerdFont = glifo de 1 celda + espacio + letra + `:` para todas
+/// (`\u{f0a0}` floppy, `\u{f4bc}` disco, `\u{f111}` óptico).
+/// Devuelve el ancho dibujado (retro 6–7, NF 4).
 #[allow(clippy::too_many_arguments)] // firma del contrato icons20: contexto completo en una llamada
 pub fn drive_badge(
     buf: &mut Buffer,
@@ -60,12 +61,13 @@ pub fn drive_badge(
         (Color::White, theme.desktop)
     };
     let base = Attr::new(fg, bg);
-    if mode == IconMode::NerdFont && !matches!(drive_type, DriveType::HardDisk | DriveType::CdRom) {
-        buf.set(
-            x,
-            y,
-            Cell::with_attr('\u{f0a0}', Attr::new(Color::Yellow, bg)),
-        );
+    if mode == IconMode::NerdFont {
+        let g = match drive_type {
+            DriveType::Floppy35 | DriveType::Floppy525 => '\u{f0a0}',
+            DriveType::HardDisk => '\u{f4bc}',
+            DriveType::CdRom => '\u{f111}',
+        };
+        buf.set(x, y, Cell::with_attr(g, Attr::new(Color::Yellow, bg)));
         buf.set(x.saturating_add(1), y, Cell::new(' ', fg, bg));
         buf.set(x.saturating_add(2), y, Cell::with_attr(up, base));
         buf.set(x.saturating_add(3), y, Cell::with_attr(':', base));
@@ -280,10 +282,10 @@ mod tests {
     }
 
     #[test]
-    fn drive_nerdfont_floppy_glyph_and_hd_carcass() {
+    fn drive_nerdfont_uniform_badges() {
         let t = theme();
-        let mut b = Buffer::blank(30, 4, t.desktop);
-        // HD en NF también viste carcasa física (sin glifos ambiguos).
+        let mut b = Buffer::blank(40, 4, t.desktop);
+        // Todas en NF: glifo + espacio + letra + ':' (ancho 4).
         let w = drive_badge(
             &mut b,
             2,
@@ -294,15 +296,26 @@ mod tests {
             false,
             t,
         );
-        assert_eq!(w, 7);
-        assert_eq!(b.get(2, 1).unwrap().ch, '[');
-        assert_eq!(b.get(3, 1).unwrap().ch, '\u{25ac}');
-        assert_eq!(b.get(4, 1).unwrap().fg, Color::Green);
-        assert_eq!(b.get(7, 1).unwrap().ch, 'C');
-        assert_eq!(b.get(7, 1).unwrap().fg, Color::White);
+        assert_eq!(w, 4);
+        assert_eq!(b.get(2, 1).unwrap().ch, '\u{f4bc}');
+        assert_eq!(b.get(3, 1).unwrap().ch, ' ');
+        assert_eq!(b.get(4, 1).unwrap().ch, 'C');
+        assert_eq!(b.get(4, 1).unwrap().fg, Color::White);
         let w2 = drive_badge(
             &mut b,
-            12,
+            8,
+            1,
+            'd',
+            DriveType::CdRom,
+            IconMode::NerdFont,
+            false,
+            t,
+        );
+        assert_eq!(w2, 4);
+        assert_eq!(b.get(8, 1).unwrap().ch, '\u{f111}');
+        let w3 = drive_badge(
+            &mut b,
+            14,
             1,
             'a',
             DriveType::Floppy35,
@@ -310,8 +323,22 @@ mod tests {
             false,
             t,
         );
-        assert_eq!(w2, 4);
-        assert_eq!(b.get(12, 1).unwrap().ch, '\u{f0a0}');
+        assert_eq!(w3, 4);
+        assert_eq!(b.get(14, 1).unwrap().ch, '\u{f0a0}');
+        // Activa: badge completo uniforme en amarillo/negro.
+        drive_badge(
+            &mut b,
+            20,
+            1,
+            'c',
+            DriveType::HardDisk,
+            IconMode::NerdFont,
+            true,
+            t,
+        );
+        assert_eq!(b.get(20, 1).unwrap().bg, Color::Yellow);
+        assert_eq!(b.get(22, 1).unwrap().bg, Color::Yellow);
+        assert_eq!(b.get(22, 1).unwrap().fg, Color::Black);
     }
 
     #[test]
