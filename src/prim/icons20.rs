@@ -39,9 +39,13 @@ pub enum DriveType {
 /// con texto negro, uniforme en todo el badge). Dos estéticas coherentes:
 /// retro = carcasa de hardware para todas (`[≡]`/`[═]` floppy,
 /// `[▬-]` disco con LED verde, `[○]` CD, letra en blanco);
-/// NerdFont = glifo de 1 celda + espacio + letra + `:` para todas
-/// (`\u{f0a0}` floppy, `\u{f4bc}` disco, `\u{f111}` óptico).
-/// Devuelve el ancho dibujado (retro 6–7, NF 4).
+/// NerdFont = homogéneo para todas: glifo `\u{f0a0}` + espacio + letra
+/// en mayúscula + `:` + espacio separador (5 celdas exactas, ninguna
+/// vacía ni con caracteres extraños).
+/// Estilo NF: inactiva = icono `Yellow` + letra `White` sobre
+/// `theme.desktop`; activa = cols 0..=3 con fondo `Yellow`, icono y
+/// texto en `Black` bold (col 4 = separador sobre `theme.desktop`).
+/// Devuelve el ancho dibujado (retro 6–7, NF 5).
 #[allow(clippy::too_many_arguments)] // firma del contrato icons20: contexto completo en una llamada
 pub fn drive_badge(
     buf: &mut Buffer,
@@ -62,16 +66,30 @@ pub fn drive_badge(
     };
     let base = Attr::new(fg, bg);
     if mode == IconMode::NerdFont {
-        let g = match drive_type {
-            DriveType::Floppy35 | DriveType::Floppy525 => '\u{f0a0}',
-            DriveType::HardDisk => '\u{f4bc}',
-            DriveType::CdRom => '\u{f111}',
+        // Homogéneo: todas las unidades usan el glifo probado f0a0
+        // (drive_type solo manda en RetroCp437, aquí se ignora a propósito).
+        let abg = if active { Color::Yellow } else { theme.desktop };
+        let icon_a = if active {
+            Attr::bold(Color::Black, abg)
+        } else {
+            Attr::new(Color::Yellow, abg)
         };
-        buf.set(x, y, Cell::with_attr(g, Attr::new(Color::Yellow, bg)));
-        buf.set(x.saturating_add(1), y, Cell::new(' ', fg, bg));
-        buf.set(x.saturating_add(2), y, Cell::with_attr(up, base));
-        buf.set(x.saturating_add(3), y, Cell::with_attr(':', base));
-        return 4;
+        let text_a = if active {
+            Attr::bold(Color::Black, abg)
+        } else {
+            Attr::new(Color::White, abg)
+        };
+        buf.set(x, y, Cell::with_attr('\u{f0a0}', icon_a));
+        buf.set(x.saturating_add(1), y, Cell::new(' ', text_a.fg, abg));
+        buf.set(x.saturating_add(2), y, Cell::with_attr(up, text_a));
+        buf.set(x.saturating_add(3), y, Cell::with_attr(':', text_a));
+        // Col 4: separador siempre sobre el escritorio (fuera del invertido).
+        buf.set(
+            x.saturating_add(4),
+            y,
+            Cell::new(' ', text_a.fg, theme.desktop),
+        );
+        return 5;
     }
     // Carcasa física + letra (`A:`), LED verde en el disco duro.
     let (mid, body, w) = match drive_type {
@@ -103,11 +121,32 @@ pub fn drive_badge(
     w
 }
 
+/// Superíndice Unicode del número de función (1-12). Fuera de rango:
+/// dígitos planos como fallback (nunca vacío).
+fn fkey_super(key_num: u8) -> &'static str {
+    match key_num {
+        1 => "\u{b9}",
+        2 => "\u{b2}",
+        3 => "\u{b3}",
+        4 => "\u{2074}",
+        5 => "\u{2075}",
+        6 => "\u{2076}",
+        7 => "\u{2077}",
+        8 => "\u{2078}",
+        9 => "\u{2079}",
+        10 => "\u{b9}\u{2070}",
+        11 => "\u{b9}\u{b9}",
+        12 => "\u{b9}\u{b2}",
+        _ => "",
+    }
+}
+
 /// Tecla de función estilo Norton / CUA 1993 para la status bar:
-/// `F{n}` en amarillo brillante + negrita sobre navy, acción en blanco
-/// sobre navy, + 2 espacios de aire entre comandos. Sin bloques: toda
-/// la barra respira sobre el mismo navy.
-/// Devuelve el ancho dibujado (incluido el aire).
+/// `F` + superíndice (`F¹`…`F¹⁰`) en amarillo brillante + negrita sobre
+/// navy, acción pegada en blanco sobre navy, + 2 espacios de aire navy
+/// al final entre comandos. Sin bloques: toda la barra respira sobre
+/// el mismo navy. Devuelve el ancho dibujado = celdas exactas
+/// (`visible_len`: 1 + superíndices + acción + 2).
 pub fn fkey_badge(
     buf: &mut Buffer,
     x: u16,
@@ -118,15 +157,31 @@ pub fn fkey_badge(
 ) -> u16 {
     let num_a = Attr::bold(Color::Yellow, theme.navy);
     let act_a = Attr::new(Color::White, theme.navy);
+    let air_a = Attr::new(Color::White, theme.navy);
     let mut cx = x;
-    for ch in format!("F{key_num} ").chars() {
-        buf.set(cx, y, Cell::with_attr(ch, num_a));
-        cx = cx.saturating_add(1);
+    buf.set(cx, y, Cell::with_attr('F', num_a));
+    cx = cx.saturating_add(1);
+    let sup = fkey_super(key_num);
+    if sup.is_empty() {
+        // Fallback fuera de 1-12: dígitos planos (nunca dejar hueco).
+        for ch in format!("{key_num}").chars() {
+            buf.set(cx, y, Cell::with_attr(ch, num_a));
+            cx = cx.saturating_add(1);
+        }
+    } else {
+        for ch in sup.chars() {
+            buf.set(cx, y, Cell::with_attr(ch, num_a));
+            cx = cx.saturating_add(1);
+        }
     }
-    for ch in format!("{action}  ").chars() {
+    for ch in action.chars() {
         buf.set(cx, y, Cell::with_attr(ch, act_a));
         cx = cx.saturating_add(1);
     }
+    buf.set(cx, y, Cell::with_attr(' ', air_a));
+    cx = cx.saturating_add(1);
+    buf.set(cx, y, Cell::with_attr(' ', air_a));
+    cx = cx.saturating_add(1);
     cx.saturating_sub(x)
 }
 
@@ -285,7 +340,7 @@ mod tests {
     fn drive_nerdfont_uniform_badges() {
         let t = theme();
         let mut b = Buffer::blank(40, 4, t.desktop);
-        // Todas en NF: glifo + espacio + letra + ':' (ancho 4).
+        // Todas en NF homogéneas: f0a0 + espacio + letra + ':' + separador (5).
         let w = drive_badge(
             &mut b,
             2,
@@ -296,11 +351,17 @@ mod tests {
             false,
             t,
         );
-        assert_eq!(w, 4);
-        assert_eq!(b.get(2, 1).unwrap().ch, '\u{f4bc}');
+        assert_eq!(w, 5);
+        assert_eq!(b.get(2, 1).unwrap().ch, '\u{f0a0}');
+        assert_eq!(b.get(2, 1).unwrap().fg, Color::Yellow);
+        assert_eq!(b.get(2, 1).unwrap().bg, t.desktop);
         assert_eq!(b.get(3, 1).unwrap().ch, ' ');
         assert_eq!(b.get(4, 1).unwrap().ch, 'C');
         assert_eq!(b.get(4, 1).unwrap().fg, Color::White);
+        assert_eq!(b.get(5, 1).unwrap().ch, ':');
+        assert_eq!(b.get(6, 1).unwrap().ch, ' ');
+        assert_eq!(b.get(6, 1).unwrap().bg, t.desktop);
+        // CD y floppy usan el MISMO glifo (nada de f111/f4bc por tipo).
         let w2 = drive_badge(
             &mut b,
             8,
@@ -311,8 +372,8 @@ mod tests {
             false,
             t,
         );
-        assert_eq!(w2, 4);
-        assert_eq!(b.get(8, 1).unwrap().ch, '\u{f111}');
+        assert_eq!(w2, 5);
+        assert_eq!(b.get(8, 1).unwrap().ch, '\u{f0a0}');
         let w3 = drive_badge(
             &mut b,
             14,
@@ -323,9 +384,9 @@ mod tests {
             false,
             t,
         );
-        assert_eq!(w3, 4);
+        assert_eq!(w3, 5);
         assert_eq!(b.get(14, 1).unwrap().ch, '\u{f0a0}');
-        // Activa: badge completo uniforme en amarillo/negro.
+        // Activa: cols 0..=3 fondo amarillo, icono+texto negro bold.
         drive_badge(
             &mut b,
             20,
@@ -337,40 +398,49 @@ mod tests {
             t,
         );
         assert_eq!(b.get(20, 1).unwrap().bg, Color::Yellow);
+        assert_eq!(b.get(20, 1).unwrap().fg, Color::Black);
+        assert!(b.get(20, 1).unwrap().bold);
         assert_eq!(b.get(22, 1).unwrap().bg, Color::Yellow);
         assert_eq!(b.get(22, 1).unwrap().fg, Color::Black);
+        assert!(b.get(22, 1).unwrap().bold);
+        assert_eq!(b.get(23, 1).unwrap().bg, Color::Yellow);
+        // Col 4 = separador fuera del invertido (escritorio).
+        assert_eq!(b.get(24, 1).unwrap().bg, t.desktop);
     }
 
     #[test]
     fn fkey_badge_is_norton_style() {
         let t = theme();
         let mut b = Buffer::blank(40, 4, t.desktop);
-        // `F1 Help` + 2 de aire: 3 + 4 + 2.
+        // `F¹Help` + 2 de aire: 2 + 4 + 2 = 8.
         let w = fkey_badge(&mut b, 2, 1, 1, "Help", t);
-        assert_eq!(w, 3 + 4 + 2);
+        assert_eq!(w, 2 + 4 + 2);
         // Tecla amarilla brillante + negrita sobre navy, con prefijo F.
         assert_eq!(b.get(2, 1).unwrap().ch, 'F');
-        assert_eq!(b.get(3, 1).unwrap().ch, '1');
+        assert_eq!(b.get(3, 1).unwrap().ch, '\u{b9}');
         assert_eq!(b.get(2, 1).unwrap().bg, t.navy);
         assert_eq!(b.get(2, 1).unwrap().fg, Color::Yellow);
         assert!(b.get(2, 1).unwrap().bold);
-        // Acción en blanco sobre navy.
-        assert_eq!(b.get(5, 1).unwrap().ch, 'H');
-        assert_eq!(b.get(5, 1).unwrap().bg, t.navy);
-        assert_eq!(b.get(5, 1).unwrap().fg, Color::White);
-        // Aire final también navy (barra limpia): `F1 Help··`.
-        assert_eq!(b.get(8, 1).unwrap().ch, 'p');
+        assert!(b.get(3, 1).unwrap().bold);
+        // Acción pegada en blanco sobre navy (sin espacio intermedio).
+        assert_eq!(b.get(4, 1).unwrap().ch, 'H');
+        assert_eq!(b.get(4, 1).unwrap().bg, t.navy);
+        assert_eq!(b.get(4, 1).unwrap().fg, Color::White);
+        assert!(!b.get(4, 1).unwrap().bold);
+        // Aire final también navy (barra limpia): `F¹Help··`.
+        assert_eq!(b.get(7, 1).unwrap().ch, 'p');
+        assert_eq!(b.get(8, 1).unwrap().ch, ' ');
         assert_eq!(b.get(9, 1).unwrap().ch, ' ');
-        assert_eq!(b.get(10, 1).unwrap().ch, ' ');
-        assert_eq!(b.get(10, 1).unwrap().bg, t.navy);
-        // Ancho exacto: la celda 11 queda intacta (fondo escritorio).
-        assert_eq!(b.get(11, 1).unwrap().bg, t.desktop);
-        // Dos dígitos (`F10 Menu`): 4 + 4 + 2.
+        assert_eq!(b.get(9, 1).unwrap().bg, t.navy);
+        // Ancho exacto: la celda 10 queda intacta (fondo escritorio).
+        assert_eq!(b.get(10, 1).unwrap().bg, t.desktop);
+        // Dos superíndices (`F¹⁰Menu`): 3 + 4 + 2 = 9.
         let w2 = fkey_badge(&mut b, 14, 1, 10, "Menu", t);
-        assert_eq!(w2, 4 + 4 + 2);
+        assert_eq!(w2, 3 + 4 + 2);
         assert_eq!(b.get(14, 1).unwrap().ch, 'F');
-        assert_eq!(b.get(15, 1).unwrap().ch, '1');
-        assert_eq!(b.get(16, 1).unwrap().ch, '0');
+        assert_eq!(b.get(15, 1).unwrap().ch, '\u{b9}');
+        assert_eq!(b.get(16, 1).unwrap().ch, '\u{2070}');
+        assert_eq!(b.get(17, 1).unwrap().ch, 'M');
     }
 
     #[test]
@@ -503,7 +573,7 @@ mod tests {
             ),
             7
         );
-        assert_eq!(fkey_badge(&mut b, 9, 0, 10, "Menu", t), 4 + 4 + 2);
+        assert_eq!(fkey_badge(&mut b, 9, 0, 10, "Menu", t), 3 + 4 + 2);
         assert_eq!(
             folder_badge(
                 &mut b,

@@ -445,7 +445,8 @@ impl Show {
             t,
         );
 
-        // Fila de unidades con insignias `icons20` (A: floppy, C: disco, D: CD).
+        // Fila de unidades homogénea `icons20` NF (A:/C:/D: con f0a0,
+        // 5 celdas cada una con separador incluido): solo C: activa.
         let drv_attr = Attr::new(Color::Black, t.desktop);
         draw_text(buf, 2, 2, "ID = DEMO", drv_attr);
         let mut dx = 14u16;
@@ -454,7 +455,9 @@ impl Show {
             ('C', DriveType::HardDisk),
             ('D', DriveType::CdRom),
         ] {
-            dx += drive_badge(buf, dx, 2, drv, dt, IconMode::NerdFont, drv == 'C', t) + 1;
+            // El badge ya trae su separador (col 4): avance directo,
+            // sin +1 extra, para alineación horizontal perfecta.
+            dx += drive_badge(buf, dx, 2, drv, dt, IconMode::NerdFont, drv == 'C', t);
         }
 
         // Panel árbol con iconos de carpeta.
@@ -585,7 +588,8 @@ impl Show {
         }
 
         // Dos filas fijas al final, sin duplicados:
-        // h-2 = StatusBar por columnas, h-1 = badges de función icons20.
+        // h-2 = StatusBar por columnas, h-1 = barra F-keys icons20
+        // (F¹Help…F¹⁰Menu con superíndices, fondo navy uniforme).
         if bounds.h >= 3 {
             let fy = bounds.h - 1;
             buf.fill_rect(
