@@ -9,7 +9,8 @@
 //!
 //! Foco con Tab: árbol → archivos → dropdown → nombre → clave → fecha →
 //! radios A → radios B → casillas → lista → progreso → botones. Flechas
-//! mueven, Espacio alterna/elige, Enter acepta, Esc sale. La copia avanza
+//! mueven, Espacio alterna/elige, Enter acepta, Esc/F3 sale, F10 menú
+//! (←→ mueve, Enter abre, Esc/F10 cierra). La copia avanza
 //! sola en ciclo 0-100 (octavos visibles); en progreso `←→` ajusta ±5 a
 //! mano. En fecha: `PgUp/PgDn` mes, `Shift`+`PgUp/PgDn` año.
 //!
@@ -26,14 +27,14 @@ use g90tui::{
     button_draw, button_width, calendar_draw, calendar_field_width, calendar_key_mod, check_key,
     draw_text, drive_badge, dropdown_draw, dropdown_key, enter_screen, file_fg, filedialog_draw,
     filedialog_key, fkey_badge, folder_badge, grid_draw, input_draw, input_key, leave_screen,
-    list_key, listbox_draw, listbox_key, menubar_draw, msgbox_draw, msgbox_key, progressbar_draw,
-    radio_key, statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar, tuichart_draw,
-    vscrollbar, window, Alignment, Attr, Backend, Buffer, Buttons, CalNav, CalendarPicker, Cell,
-    ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend, DriveType,
-    Dropdown, DropdownKey, EventCtx, FKeyBar, FileDialog, FileDialogKey, FocusManager, GlyphSet,
-    GridTable, HandleEvent, HotAttrs, IconMode, InputField, InputKey, ListBox, MenuDef, MsgBoxKey,
-    RadioNav, Rect, Screen, ShadowStyle, StatusBar, TabControl, TabPosition, TableDef, TableState,
-    Theme, TuiChart, WindowOpts,
+    list_key, listbox_draw, listbox_key, menubar_draw, menubar_key, msgbox_draw, msgbox_key,
+    progressbar_draw, radio_key, statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar,
+    tuichart_draw, vscrollbar, window, Alignment, Attr, Backend, Buffer, Buttons, CalNav,
+    CalendarPicker, Cell, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color,
+    CrosstermBackend, DriveType, Dropdown, DropdownKey, EventCtx, FKeyBar, FileDialog,
+    FileDialogKey, FocusManager, GlyphSet, GridTable, HandleEvent, HotAttrs, IconMode, InputField,
+    InputKey, ListBox, MenuBarKey, MenuDef, MsgBoxKey, RadioNav, Rect, Screen, ShadowStyle,
+    StatusBar, TabControl, TabPosition, TableDef, TableState, Theme, TuiChart, WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder_badge()`.
@@ -76,6 +77,10 @@ const FOCUS_NAMES: [&str; 13] = [
 struct Show {
     screen: Screen,
     menus: Vec<MenuDef>,
+    /// Menú activo por F10 (`None` = barra decorativa).
+    menu_active: Option<usize>,
+    /// Último menú visitado (F10 lo restaura).
+    menu_last: usize,
     tree_sel: usize,
     tree_top: usize,
     files: TableDef,
@@ -231,6 +236,8 @@ impl Show {
                 MenuDef::new("Tree", &[]),
                 MenuDef::new("Help", &[]),
             ],
+            menu_active: None,
+            menu_last: 0,
             tree_sel: 0,
             tree_top: 0,
             files: TableDef::new(&[("Nombre", 12), ("Ext", 5), ("Tamaño", 9)], rows),
@@ -434,7 +441,9 @@ impl Show {
         // Columna derecha fija: atajo de ayuda (nunca se trunca: 13 <= 15).
         self.status.set_text(ci, "Alt-F1: Ayuda");
         let status = self.status.clone();
-        let active_menu = 3usize;
+        // Sin F10 la barra es decorativa (Windows resaltado, como siempre);
+        // con F10 manda `menu_active`.
+        let active_menu = self.menu_active.unwrap_or(3usize);
         let tree_vis = lay.tree_panel.h.saturating_sub(2).max(1) as usize;
         let files_vis = lay.file_panel.h.saturating_sub(3).max(1) as usize;
 
@@ -921,9 +930,44 @@ impl Show {
             }
             return false;
         }
-        // F10 también sale (como en la referencia).
-        if matches!(code, KeyCode::F(10)) {
+        // F3 = Salir (lo que dice su etiqueta).
+        if matches!(code, KeyCode::F(3)) {
             return false;
+        }
+        // Menú activo por F10: captura todo con el API canónico.
+        if let Some(a) = self.menu_active {
+            match menubar_key(&self.menus, a, code) {
+                MenuBarKey::Move(i) => {
+                    self.menu_active = Some(i);
+                    self.menu_last = i;
+                    self.message = format!("Menú: {}.", self.menus[i].title);
+                }
+                MenuBarKey::Open(i) => {
+                    // La demo no trae items: se prueba el resaltado + mensaje.
+                    self.message =
+                        format!("Menú {}: sin opciones en la demo.", self.menus[i].title);
+                }
+                MenuBarKey::Dismiss => {
+                    self.menu_last = a;
+                    self.menu_active = None;
+                    self.message = "Menú cerrado.".to_string();
+                }
+                MenuBarKey::Stay => {
+                    // F10 alterna (cierra); lo demás se ignora dentro del menú.
+                    if matches!(code, KeyCode::F(10)) {
+                        self.menu_last = a;
+                        self.menu_active = None;
+                        self.message = "Menú cerrado.".to_string();
+                    }
+                }
+            }
+            return true;
+        }
+        // F10 entra al menú (restaura el último visitado).
+        if matches!(code, KeyCode::F(10)) {
+            self.menu_active = Some(self.menu_last.min(self.menus.len() - 1));
+            self.message = "Menú: ←→ mueve, Enter abre, Esc/F10 cierra.".to_string();
+            return true;
         }
         // F4 alterna la vista de gráficos.
         if matches!(code, KeyCode::F(4)) {
