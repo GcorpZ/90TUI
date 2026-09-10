@@ -22,9 +22,9 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 
 | Función | Parámetros | Devuelve | Efecto |
 |---|---|---|---|
-| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | marco `BorderStyle::{None, Single, Double, Bevel3D}` (presets con `Double`) + título centrado incrustado + sombra cromática + caja `[■]` (`\u{25a0}`) en `x+1,x+2,x+3` opt |
+| `window(buf, rect, opts, theme)` | `&mut Buffer`, `Rect`, `&WindowOpts`, `Theme` | — | marco `BorderStyle::{None, Single, Double, Bevel3D}` (presets con `Double`) + título centrado incrustado + sombra neutra por luminancia + caja `[■]` (`\u{25a0}`) en `x+1,x+2,x+3` opt |
 | `WindowOpts::modal/form/dialog(título, theme)` | `&str`, `Theme` | `WindowOpts` | presets gris/negro/menta con `Single` (`.controls`, `.shadow_style`, `.border_color` tiñe glifos, `.shadow`=`has_shadow`, `border_style` elegible) |
-| `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra cromática (offset 2,1): conserva glifo, oscurece fg/bg con `darken_color` + `dim` ANSI |
+| `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra neutra (offset 2,1): conserva glifo, atenúa fg/bg por luminancia con `darken_color` (jamás tinte) + `dim` ANSI |
 | `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes (botones = sólida) |
 | `Cell.dim` / `Attr::faint` | flag | — | `\x1b[2m` real en el backend |
 | `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal 1 fila, padding 2 por lado (`  TEXTO  `, mín. 10); sombra media celda con fondo REAL detectado: lateral `▄` + inferior `▀`, tinta negra |

@@ -1,10 +1,11 @@
 //! Sombras estilo VGA/modo texto: translúcidas, tramadas o sólidas.
 //!
 //! El truco de la época (visible en las capturas de referencia) no era
-//! pintar un bloque negro opaco, sino **oscurecer lo que ya había**:
-//! * **Translucent** (estilo PCTools/gestión/Norton): conserva el glifo y
-//!   atenúa sus colores con `darken_color` (fg ×0.50, bg ×0.40) más `dim`
-//!   ANSI — el contenido se adivina debajo con su tinte original, y eso
+//! pintar un bloque negro opaco, sino **oscurecer lo que ya había** hacia
+//! un neutro oscuro (nunca conservar tinte: el cian NO va a marino).
+//! * **Translucent** (default ventanas): conserva el glifo y atenúa por
+//!   luminancia con `darken_color` (fg ×0.50, bg ×0.40) más `dim`
+//!   ANSI — el contenido se adivina debajo en gris oscuro, y eso
 //!   el ojo lo lee como "sombra" en vez de "barra". El fondo negro sólido
 //!   (`theme.shadow`) solo queda para `Solid`/`Stipple`.
 //! * **Stipple** (estilo Turbo): tramado ajedrez 50%: una celda sí, una
@@ -27,40 +28,47 @@ pub enum ShadowStyle {
     Solid,
 }
 
-/// Un paso de oscurecimiento sobre la paleta fija de 12 colores ANSI:
-/// brillantes → su equivalente oscuro; oscuros → el mínimo de su tinte
-/// (o negro si ya es mínimo); blanco/gris claro → gris oscuro.
-/// (Nota: el motor es ANSI-16 sin `Rgb`/`AnsiValue`, así que la
-/// atenuación es por tabla discreta en vez de multiplicar canales.)
-fn darken_step(c: Color) -> Color {
+/// Aproximación RGB de cada color ANSI-16 (el motor no tiene `Rgb`:
+/// la atenuación se calcula en este espacio y se cuantiza de vuelta
+/// a neutro). Valores VGA estándar 0-255.
+fn rgb_approx(c: Color) -> (f32, f32, f32) {
     use Color::*;
     match c {
-        Black => Black,
-        Navy => Black,
-        Blue => Navy,
-        Teal => Navy,
-        Cyan => Teal,
-        DarkGrey => Black,
-        Grey => DarkGrey,
-        White => Grey,
-        Yellow => Green,
-        Mint => Green,
-        Red => Black,
-        Green => Black,
+        Black => (0.0, 0.0, 0.0),
+        Navy => (0.0, 0.0, 128.0),
+        Blue => (0.0, 0.0, 255.0),
+        Teal => (0.0, 128.0, 128.0),
+        Cyan => (0.0, 255.0, 255.0),
+        DarkGrey => (128.0, 128.0, 128.0),
+        Grey => (192.0, 192.0, 192.0),
+        White => (255.0, 255.0, 255.0),
+        Yellow => (255.0, 255.0, 0.0),
+        Mint => (100.0, 255.0, 170.0),
+        Red => (255.0, 0.0, 0.0),
+        Green => (0.0, 128.0, 0.0),
     }
 }
 
-/// Oscurecimiento cromático natural (estilo Norton/Clipper).
-/// `factor >= 0.5` baja 1 escalón, `< 0.5` baja 2; el negro es el suelo
-/// (nunca se sale de la paleta). El tinte se conserva siempre que la
-/// paleta tenga un escalón más profundo para él.
+/// Oscurecimiento por escala de luminancia (nunca conserva tinte).
+/// Luminancia Rec.601 `0.299R+0.587G+0.114B` × factor, cuantizada a
+/// escala neutra: `>=110 → Grey`, `>=25 → DarkGrey`, si no `Black`.
+/// El negro es el suelo. Jamás devuelve `Navy`/`Blue`/`Teal`/`Cyan`
+/// (esos eran las franjas azuladas sobre cian).
 pub fn darken_color(c: Color, factor: f32) -> Color {
-    let steps = if factor < 0.5 { 2 } else { 1 };
-    let mut out = c;
-    for _ in 0..steps {
-        out = darken_step(out);
+    if c == Color::Black {
+        return Color::Black;
     }
-    out
+    let f = factor.clamp(0.0, 1.0);
+    let (r, g, b) = rgb_approx(c);
+    let lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    let scaled = lum * f;
+    if scaled >= 110.0 {
+        Color::Grey
+    } else if scaled >= 25.0 {
+        Color::DarkGrey
+    } else {
+        Color::Black
+    }
 }
 
 /// Sombra clásica con offset (2, 1), estilo translúcido.
@@ -146,10 +154,10 @@ mod tests {
         let mut b = Buffer::blank(10, 6, Color::White);
         b.text(3, 2, "AB", Color::Black, Color::White);
         shadow(&mut b, Rect::new(1, 1, 4, 2), t);
-        // La sombra cae en (3,2): glifo intacto, colores atenuados.
+        // La sombra cae en (3,2): glifo intacto, colores atenuados a neutro.
         let c = b.get(3, 2).unwrap();
         assert_eq!(c.ch, 'A');
-        // Oscurecimiento cromático, NO negro sólido.
+        // Atenuación neutra, NO negro sólido ni tinte azul.
         assert_eq!(c.bg, darken_color(Color::White, 0.40));
         assert_ne!(c.bg, t.shadow);
         assert_eq!(c.fg, darken_color(Color::Black, 0.50));
@@ -157,27 +165,58 @@ mod tests {
         assert!(c.dim);
         // El cuerpo original no se toca.
         assert_eq!(b.get(1, 1).unwrap().bg, Color::White);
-        // Cian brillante → tinte frío profundo, tampoco negro.
+        // Cian brillante → gris neutro, jamás Navy/Teal.
         let mut b2 = Buffer::blank(10, 6, Color::Cyan);
         shadow(&mut b2, Rect::new(1, 1, 4, 2), t);
         let c2 = b2.get(3, 2).unwrap();
         assert_eq!(c2.bg, darken_color(Color::Cyan, 0.40));
+        assert_eq!(c2.bg, Color::DarkGrey);
+        assert_ne!(c2.bg, Color::Navy);
         assert_ne!(c2.bg, t.shadow);
     }
 
     #[test]
-    fn darken_color_steps_bright_to_dark() {
-        // factor >= 0.5 = 1 escalón, < 0.5 = 2 escalones.
+    fn darken_color_is_neutral_luminance() {
+        // Blancos: fg 0.50 → Grey, bg 0.40 → DarkGrey (distintos).
         assert_eq!(darken_color(Color::White, 0.50), Color::Grey);
         assert_eq!(darken_color(Color::White, 0.40), Color::DarkGrey);
-        assert_eq!(darken_color(Color::Cyan, 0.50), Color::Teal);
-        assert_eq!(darken_color(Color::Cyan, 0.40), Color::Navy);
-        assert_eq!(darken_color(Color::Blue, 0.50), Color::Navy);
-        assert_eq!(darken_color(Color::Yellow, 0.50), Color::Green);
-        // El negro es el suelo: nunca se sale de la paleta.
+        // Colores brillantes → neutro, NUNCA tinte (el bug era Cyan→Navy).
+        assert_eq!(darken_color(Color::Cyan, 0.50), Color::DarkGrey);
+        assert_eq!(darken_color(Color::Cyan, 0.40), Color::DarkGrey);
+        assert_eq!(darken_color(Color::Yellow, 0.50), Color::Grey);
+        assert_eq!(darken_color(Color::Red, 0.50), Color::DarkGrey);
+        assert_eq!(darken_color(Color::Green, 0.50), Color::DarkGrey);
+        assert_eq!(darken_color(Color::Grey, 0.50), Color::DarkGrey);
+        // Grises medios se quedan en DarkGrey (no colapsan a negro:
+        // ese era el bloque opaco sobre ventanas).
+        assert_eq!(darken_color(Color::Grey, 0.40), Color::DarkGrey);
+        assert_eq!(darken_color(Color::DarkGrey, 0.50), Color::DarkGrey);
+        assert_eq!(darken_color(Color::DarkGrey, 0.40), Color::DarkGrey);
+        // Oscuros ya mínimos → suelo negro.
         assert_eq!(darken_color(Color::Black, 0.40), Color::Black);
-        assert_eq!(darken_color(Color::Red, 0.50), Color::Black);
-        assert_eq!(darken_color(Color::Green, 0.40), Color::Black);
+        assert_eq!(darken_color(Color::Navy, 0.50), Color::Black);
+        assert_eq!(darken_color(Color::Blue, 0.50), Color::Black);
+        // Invariante global: jamás devuelve tinte frío.
+        for c in [
+            Color::Black,
+            Color::Navy,
+            Color::Blue,
+            Color::Teal,
+            Color::Cyan,
+            Color::DarkGrey,
+            Color::Grey,
+            Color::White,
+            Color::Yellow,
+            Color::Mint,
+            Color::Red,
+            Color::Green,
+        ] {
+            let out = darken_color(c, 0.40);
+            assert!(
+                !matches!(out, Color::Navy | Color::Blue | Color::Teal | Color::Cyan),
+                "tinte en {c:?} → {out:?}"
+            );
+        }
     }
 
     #[test]

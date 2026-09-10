@@ -56,7 +56,7 @@ fn modal_window_with_buttons() {
     assert_eq!(bw, 7 + 4);
     assert_eq!(b.get(r.x + 4, r.y + r.h - 2).unwrap().ch, 'O');
 
-    // Cuerpo gris, sombra cromática (cian → marino, no negro).
+    // Cuerpo gris, sombra neutra (cian → gris oscuro, ni azul ni negro).
     assert_eq!(b.get(r.x + 1, r.y + 2).unwrap().bg, t.window_bg);
     assert_eq!(
         b.get(r.x + 2, r.y + r.h).unwrap().bg,

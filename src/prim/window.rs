@@ -312,8 +312,8 @@ mod tests {
         assert_eq!(b.get(6, 3).unwrap().bg, t.teal);
         // Cuerpo gris.
         assert_eq!(b.get(6, 5).unwrap().bg, Color::Grey);
-        // Sombra cromática en (x+2, y+h): el cian del escritorio baja a
-        // azul marino profundo, no a negro sólido.
+        // Sombra neutra en (x+2, y+h): el cian del escritorio baja a
+        // gris oscuro por luminancia, no a azul ni a negro sólido.
         let sh = b.get(7, 3 + 9).unwrap();
         assert_eq!(sh.bg, darken_color(t.desktop, 0.40));
         assert_ne!(sh.bg, Color::Black);

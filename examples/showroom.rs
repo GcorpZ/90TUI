@@ -218,8 +218,11 @@ impl Show {
             vec!["unformt".into(), "exe".into(), "1375441".into()],
             vec!["wpatch".into(), "com".into(), "40654".into()],
         ];
+        // Tema único en todo el showroom: una sola variable, sin mezclas
+        // clipper/turbo ni fondos hardcodeados (todo deriva de `theme`).
+        let theme = Theme::clipper();
         let mut show = Self {
-            screen: Screen::new(w, h, Theme::clipper()),
+            screen: Screen::new(w, h, theme),
             menus: vec![
                 MenuDef::new("File", &[]),
                 MenuDef::new("Disk", &[]),
@@ -266,11 +269,7 @@ impl Show {
             charts_view: false,
             file_dialog: None,
             msgbox_sel: None,
-            tabs: TabControl::new(
-                &["General", "Inventario"],
-                TabPosition::Top,
-                Theme::clipper(),
-            ),
+            tabs: TabControl::new(&["General", "Inventario"], TabPosition::Top, theme),
             grid: GridTable::new(
                 &["Ref", "Descripción", "Cant.", "Costo"],
                 vec![
@@ -435,7 +434,7 @@ impl Show {
 
         let buf: &mut Buffer = self.screen.frame();
         // Escritorio del tema (cian Clipper): las sombras translúcidas lo
-        // atenúan a marino en vez de crear bloques negros.
+        // atenúan a gris oscuro neutro por luminancia (ni azul ni negro).
         buf.fill_rect(bounds, Cell::blank(t.desktop));
         top_bar(buf, "G90TUI Showroom", "12:00", t);
         menubar_draw(
@@ -463,8 +462,10 @@ impl Show {
             let p = lay.tree_panel;
             let mut wo = WindowOpts::modal("ID = DEMO", t);
             wo.controls = true;
-            // Sombra cromática translúcida como el diálogo central: el
-            // escritorio se atenúa (cian→marino), sin bloques negros.
+            // Sombra neutra translúcida como el diálogo central: el
+            // escritorio se atenúa por luminancia (cian→gris oscuro neutro),
+            // sin franjas azules ni bloques negros. Un solo tema `t` en
+            // todo el showroom (sin mezclas clipper/turbo).
             wo.shadow_style = ShadowStyle::Translucent;
             window(buf, p, &wo, t);
             let vis = tree_vis;
