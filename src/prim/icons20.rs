@@ -185,7 +185,33 @@ pub fn fkey_badge(
     cx.saturating_sub(x)
 }
 
+/// Caja de cierre integrada al marco superior (`┤■├` / `╡■╞`).
+/// A diferencia de `win_close` (corchetes ASCII flotantes), esta forma
+/// parte continua de la línea horizontal: `left` y `right` son los
+/// conectores del marco (`┤`/`├` en simple, `╡`/`╞` en doble), `frame`
+/// la tinta del marco sobre el fondo del título y `accent` (típico
+/// `Yellow` bold) el `■` central. Ancho fijo 3.
+pub fn win_close_framed(
+    buf: &mut Buffer,
+    x: u16,
+    y: u16,
+    left: char,
+    right: char,
+    frame: Attr,
+    accent: Color,
+) -> u16 {
+    buf.set(x, y, Cell::with_attr(left, frame));
+    buf.set(
+        x.saturating_add(1),
+        y,
+        Cell::with_attr('\u{25a0}', Attr::bold(accent, frame.bg)),
+    );
+    buf.set(x.saturating_add(2), y, Cell::with_attr(right, frame));
+    3
+}
+
 /// Caja de cierre `[■]` (`\u{25a0}`). Ancho fijo 3.
+/// Variante flotante clásica (la integrada al marco es `win_close_framed`).
 pub fn win_close(buf: &mut Buffer, x: u16, y: u16, attr: Attr, accent: Color) -> u16 {
     buf.set(x, y, Cell::with_attr('[', attr));
     buf.set(
@@ -254,6 +280,26 @@ pub fn folder_badge(
             buf.set(x.saturating_add(2), y, Cell::with_attr(']', a));
             3
         }
+    }
+}
+
+/// Color de texto Norton Commander según extensión (sin glifos: la
+/// diferencia es solo cromática): ejecutables (`exe/com/bat`) `Green`,
+/// datos (`dbf/dat/ntx`) `Cyan`, configuración (`sys/ini/cpz`) `Yellow`,
+/// texto/docs (`txt/doc`) `Grey`, resto `White`.
+pub fn file_fg(name: &str) -> Color {
+    match name
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "exe" | "com" | "bat" => Color::Green,
+        "dbf" | "dat" | "ntx" => Color::Cyan,
+        "sys" | "ini" | "cpz" => Color::Yellow,
+        "txt" | "doc" => Color::Grey,
+        _ => Color::White,
     }
 }
 
@@ -456,6 +502,39 @@ mod tests {
         assert_eq!(b.get(10, 1).unwrap().ch, '\u{25bc}');
         assert_eq!(win_resize_grip(&mut b, 13, 1, a), 1);
         assert_eq!(b.get(13, 1).unwrap().ch, '\u{25e2}');
+        // Cierre integrado al marco: conectores + ■ amarillo bold.
+        let f = Attr::new(Color::White, t.teal);
+        assert_eq!(
+            win_close_framed(&mut b, 16, 1, '\u{2524}', '\u{251c}', f, Color::Yellow),
+            3
+        );
+        assert_eq!(b.get(16, 1).unwrap().ch, '\u{2524}');
+        assert_eq!(b.get(17, 1).unwrap().ch, '\u{25a0}');
+        assert_eq!(b.get(17, 1).unwrap().fg, Color::Yellow);
+        assert!(b.get(17, 1).unwrap().bold);
+        assert_eq!(b.get(18, 1).unwrap().ch, '\u{251c}');
+        assert_eq!(
+            win_close_framed(&mut b, 20, 1, '\u{2561}', '\u{255e}', f, Color::Yellow),
+            3
+        );
+        assert_eq!(b.get(20, 1).unwrap().ch, '\u{2561}');
+        assert_eq!(b.get(22, 1).unwrap().ch, '\u{255e}');
+    }
+
+    #[test]
+    fn file_fg_is_norton_by_extension() {
+        assert_eq!(file_fg("PARK.EXE"), Color::Green);
+        assert_eq!(file_fg("run.com"), Color::Green);
+        assert_eq!(file_fg("a.bat"), Color::Green);
+        assert_eq!(file_fg("APROD.DBF"), Color::Cyan);
+        assert_eq!(file_fg("x.dat"), Color::Cyan);
+        assert_eq!(file_fg("y.ntx"), Color::Cyan);
+        assert_eq!(file_fg("CONFIG.SYS"), Color::Yellow);
+        assert_eq!(file_fg("a.ini"), Color::Yellow);
+        assert_eq!(file_fg("b.cpz"), Color::Yellow);
+        assert_eq!(file_fg("LEEME.TXT"), Color::Grey);
+        assert_eq!(file_fg("a.doc"), Color::Grey);
+        assert_eq!(file_fg("RARO.XYZ"), Color::White);
     }
 
     #[test]

@@ -24,7 +24,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
 use g90tui::{
     button_draw, button_width, calendar_draw, calendar_field_width, calendar_key_mod, check_key,
-    draw_text, drive_badge, dropdown_draw, dropdown_key, enter_screen, file_badge, filedialog_draw,
+    draw_text, drive_badge, dropdown_draw, dropdown_key, enter_screen, file_fg, filedialog_draw,
     filedialog_key, fkey_badge, folder_badge, grid_draw, input_draw, input_key, leave_screen,
     list_key, listbox_draw, listbox_key, menubar_draw, msgbox_draw, msgbox_key, progressbar_draw,
     radio_key, statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar, tuichart_draw,
@@ -541,8 +541,9 @@ impl Show {
                 "56 Listed = 3,482,374 Bytes",
                 t,
             );
-            // Iconos icons20 por extensión: 2 celdas (glifo + aire) y el
-            // nombre alineado en x+2, todo sobre el fondo de la fila.
+            // Nombres al ras de la columna izquierda, sin prefijos ni
+            // glifos parásitos: el tipo se distingue SOLO por color Norton
+            // (`file_fg`: exe verde, datos cian, config amarillo, txt gris).
             for i in 0..files_vis {
                 let Some(row) = self.files.rows.get(files_state.top + i) else {
                     break;
@@ -555,15 +556,14 @@ impl Show {
                 );
                 let selected = files_state.top + i == files_state.row;
                 let row_bg = if selected { t.select_bg } else { t.window_bg };
-                file_badge(buf, area.x, y, &full, IconMode::NerdFont, row_bg);
                 let fg = if selected {
                     t.popup_sel_attr().fg
                 } else {
-                    t.form_attr().fg
+                    file_fg(&full)
                 };
                 if let Some(name) = row.first() {
                     for (k, ch) in name.chars().take(10).enumerate() {
-                        let x = area.x.saturating_add(2).saturating_add(k as u16);
+                        let x = area.x.saturating_add(k as u16);
                         buf.set(x, y, Cell::new(ch, fg, row_bg));
                     }
                 }

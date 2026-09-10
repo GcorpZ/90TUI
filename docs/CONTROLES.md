@@ -40,8 +40,9 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `folder(buf, x, y, open, attr, accent, glyphs)` | `FolderGlyphs::{nerd, ascii}` | `u16`=1 | U+F07B/U+F07C o ASCII |
 | `drive(buf, x, y, letra, attr, accent)` | `char` | `u16`=4 | `[C:]` |
 | `win_close / win_min(buf, x, y, ...)` | — | `u16`=3 | `[■]` / `[-]` de título |
-| `icons20::{drive_badge, folder_badge, file_badge, fkey_badge}` (`IconMode::{RetroCp437, NerdFont}`) | `DriveType::{Floppy35, Floppy525, HardDisk, CdRom}`, activo; `bg` del llamante | `u16`=1–7 | carcasas `[≡]/[═]/[▬-]/[○]` o NF homogéneo `U+F0A0` + ` A:` + separador (5 celdas, C: activa en amarillo), `[+]/[-]` sin parches, `*`/`≡`/`·` + aire (nombre en x+2), `F¹Help` superíndice Norton + 2 aire |
-| `icons20::{win_close, win_zoom, win_min}` / `win_resize_grip` | `attr`, `accent` | `u16`=3 / 1 | `[■]` `[▲]` `[▼]` / `◢` |
+| `icons20::{drive_badge, folder_badge, file_badge, fkey_badge}` (`IconMode::{RetroCp437, NerdFont}`) | `DriveType::{Floppy35, Floppy525, HardDisk, CdRom}`, activo; `bg` del llamante | `u16`=1–7 | carcasas `[≡]/[═]/[▬-]/[○]` o NF homogéneo `U+F0A0` + ` A:` + separador (5 celdas, C: activa en amarillo), `[+]/[-]` sin parches, `*`/`≡`/`·` + aire (nombre en x+2), `F¹Help` superíndice Norton + 2 aire, `file_fg(nombre)` = color Norton por ext (exe verde, datos cian, cfg amarillo, txt gris, resto blanco, sin glifos) |
+| `icons20::{win_close, win_zoom, win_min}` / `win_resize_grip` | `attr`, `accent` | `u16`=3 / 1 | `[■]` `[▲]` `[▼]` / `◢` (flotantes clásicos) |
+| `icons20::win_close_framed(buf, x, y, left, right, frame, accent)` | `┤/├` simple, `╡/╞` doble | `u16`=3 | `┤■├` / `╡■╞` (`■` `Yellow` bold) integrado al marco en `x+3..x+5` |
 
 ## widgets — controles de una llamada (`g90tui::widgets`)
 
@@ -70,7 +71,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `fkey_bar_stacked(buf, y, keys, style)` | 2 filas | F sobre el número, alineados |
 | `fkey_bar_compact(buf, y, keys, style)` | 1 fila | `F¹Help F²Qview F¹⁰Menu` (F + superíndice) |
 | `statusbar_draw(buf, y, bar)` | `StatusBar` + `add_column(start_col, max_len, Alignment)` | penúltima fila (h-2) por secciones; `set_text(i)` dinámico; última fila (h-1) solo F-keys; prohibido duplicar barras |
-| `win_close(buf, x, y, ...)` | — | `u16`=3 | `[■]` (`\u{25a0}`) parte del borde superior, no flotante |
+| `win_close(buf, x, y, ...)` / `win_close_framed(buf, x, y, left, right, frame, accent)` | — | `u16`=3 | `[■]` flotante en `None`, `┤■├`/`╡■╞` integrado en `Single`/`Double` (`x+3..x+5`, 2 aire tras esquina) |
 | `filedialog_draw(buf, screen, dlg, theme)` | `FileDialog::new(&ruta)` (`std::fs`, árbol + `ListBox`) | `filedialog_key` → `Accepted(PathBuf)` / `Cancelled`; Enter entra/elige, Bksp sube |
 | `textarea_draw(buf, rect, area, focused)` | `TextArea{lines, cursor, max_chars, fg/bg/active_bg, border_color, has_shadow}` | `textarea_key` → Enter parte línea, flechas/PgUp/PgDn navegan, scroll vertical |
 | `hyperlink_draw(buf, x, y, link)` | `Hyperlink{text, url}` | texto negrita coloreado; `osc8_sequence()` = `\x1b]8;;URL\x1b\\TEXTO\x1b]8;;\x1b\\` clickeable |

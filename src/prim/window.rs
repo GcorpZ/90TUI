@@ -76,8 +76,11 @@ pub struct WindowOpts {
     pub border_color: Option<Color>,
     /// Estilo de marco perimetral (los presets usan `Single`).
     pub border_style: BorderStyle,
-    /// Pinta caja de cierre `[■]` (`\u{25a0}`) incrustada en el borde
-    /// superior: ocupa `x+1, x+2, x+3` relativos a la esquina.
+    /// Pinta caja de cierre integrada al marco superior (`┤■├` en
+    /// `Single`/`Bevel3D`, `╡■╞` en `Double`, `■` en `Yellow` bold):
+    /// ocupa `x+3, x+4, x+5` relativos a la esquina, dejando 2 celdas
+    /// de línea horizontal antes (`┌──┤■├─`, nunca `┌[■]─`).
+    /// En `BorderStyle::None` (sin marco) sigue el flotante `[■]` ASCII.
     pub controls: bool,
 }
 
@@ -198,8 +201,8 @@ fn draw_flat(buf: &mut Buffer, rect: Rect, opts: &WindowOpts) {
 
 /// Ventana con marco CP437: el cuerpo se rellena primero y el marco se
 /// pinta encima (nunca lo pisa). El título va incrustado y centrado en la
-/// fila superior sin romper el recuadro; los controles reemplazan marco
-/// desde `x+1` sin desplazar la esquina.
+/// fila superior sin romper el recuadro; el cierre reemplaza marco
+/// desde `x+3` con conectores (`┤■├`/`╡■╞`) tras 2 celdas de aire.
 fn draw_framed(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, g: &FrameGlyphs) {
     buf.fill_rect(rect, Cell::new(' ', opts.body_fg, opts.body_bg));
     // Tinta del marco: `border_color`, del cuerpo si no hay, o bisel
@@ -260,14 +263,21 @@ fn draw_framed(buf: &mut Buffer, rect: Rect, opts: &WindowOpts, g: &FrameGlyphs)
         bottom,
         Cell::with_attr(g.br, Attr::new(dark, opts.body_bg)),
     );
-    // Título centrado entre esquinas + cierre en `x+1..x+3`.
+    // Título centrado entre esquinas + cierre integrado al marco en
+    // `x+3..x+5` (2 celdas de aire tras la esquina: `┌──┤■├─`).
     draw_title_text(buf, rect, rect.w.saturating_sub(2), opts);
     if opts.controls && rect.w >= 8 {
-        super::icons::win_close(
+        let (left, right) = match opts.border_style {
+            BorderStyle::Double => ('\u{2561}', '\u{255e}'),
+            _ => ('\u{2524}', '\u{251c}'),
+        };
+        super::icons20::win_close_framed(
             buf,
-            rect.x.saturating_add(1),
+            rect.x.saturating_add(3),
             rect.y,
-            title_attr(opts),
+            left,
+            right,
+            Attr::new(bright, opts.title_bg),
             Color::Yellow,
         );
     }
@@ -343,12 +353,23 @@ mod tests {
         let mut opts = WindowOpts::modal("ORDENAR", t);
         opts.controls = true;
         window(&mut b, r, &opts, t);
-        // `[■]` incrustado en x+1, x+2, x+3: corchetes + `\u{25a0}` amarillo.
-        assert_eq!(b.get(6, 3).unwrap().ch, '[');
-        assert_eq!(b.get(7, 3).unwrap().ch, '\u{25a0}');
-        assert_eq!(b.get(7, 3).unwrap().fg, Color::Yellow);
-        assert_eq!(b.get(8, 3).unwrap().ch, ']');
-        // Borde opt-in tiñe los glifos del marco (fondo sigue del cuerpo).
+        // `┌──┤■├─`: 2 celdas de línea tras la esquina + cierre integrado.
+        assert_eq!(b.get(6, 3).unwrap().ch, '\u{2500}'); // ─ aire
+        assert_eq!(b.get(7, 3).unwrap().ch, '\u{2500}'); // ─ aire
+        assert_eq!(b.get(8, 3).unwrap().ch, '\u{2524}'); // ┤
+        assert_eq!(b.get(9, 3).unwrap().ch, '\u{25a0}'); // ■
+        assert_eq!(b.get(9, 3).unwrap().fg, Color::Yellow);
+        assert!(b.get(9, 3).unwrap().bold);
+        assert_eq!(b.get(10, 3).unwrap().ch, '\u{251c}'); // ├
+                                                          // Doble: `╞/╡` en vez de `├/┤`.
+        let mut dbl = WindowOpts::modal("D", t);
+        dbl.border_style = BorderStyle::Double;
+        dbl.controls = true;
+        window(&mut b, r, &dbl, t);
+        assert_eq!(b.get(8, 3).unwrap().ch, '\u{2561}'); // ╡
+        assert_eq!(b.get(9, 3).unwrap().ch, '\u{25a0}');
+        assert_eq!(b.get(10, 3).unwrap().ch, '\u{255e}'); // ╞
+                                                          // Borde opt-in tiñe los glifos del marco (fondo sigue del cuerpo).
         let mut bordered = WindowOpts::modal("B", t);
         bordered.border_color = Some(Color::Red);
         window(&mut b, r, &bordered, t);
