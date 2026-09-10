@@ -142,10 +142,10 @@ fn fkey_super(key_num: u8) -> &'static str {
 }
 
 /// Tecla de función estilo Norton / CUA 1993 para la status bar:
-/// `F` + superíndice (`F¹`…`F¹⁰`) en amarillo brillante + negrita sobre
-/// navy, acción pegada en blanco sobre navy, + 2 espacios de aire navy
-/// al final entre comandos. Sin bloques: toda la barra respira sobre
-/// el mismo navy. Devuelve el ancho dibujado = celdas exactas
+/// `F` en amarillo brillante + número en superíndice `DarkYellow` (ambos
+/// bold sobre navy), acción pegada en blanco sobre navy, + 2 espacios de
+/// aire navy al final entre comandos. Sin bloques: toda la barra respira
+/// sobre el mismo navy. Devuelve el ancho dibujado = celdas exactas
 /// (`visible_len`: 1 + superíndices + acción + 2).
 pub fn fkey_badge(
     buf: &mut Buffer,
@@ -155,11 +155,12 @@ pub fn fkey_badge(
     action: &str,
     theme: Theme,
 ) -> u16 {
-    let num_a = Attr::bold(Color::Yellow, theme.navy);
+    let f_a = Attr::bold(Color::Yellow, theme.navy);
+    let num_a = Attr::bold(Color::DarkYellow, theme.navy);
     let act_a = Attr::new(Color::White, theme.navy);
     let air_a = Attr::new(Color::White, theme.navy);
     let mut cx = x;
-    buf.set(cx, y, Cell::with_attr('F', num_a));
+    buf.set(cx, y, Cell::with_attr('F', f_a));
     cx = cx.saturating_add(1);
     let sup = fkey_super(key_num);
     if sup.is_empty() {
@@ -461,12 +462,13 @@ mod tests {
         // `F¹Help` + 2 de aire: 2 + 4 + 2 = 8.
         let w = fkey_badge(&mut b, 2, 1, 1, "Help", t);
         assert_eq!(w, 2 + 4 + 2);
-        // Tecla amarilla brillante + negrita sobre navy, con prefijo F.
+        // Tecla amarilla brillante + número DarkYellow (ambos bold, navy).
         assert_eq!(b.get(2, 1).unwrap().ch, 'F');
         assert_eq!(b.get(3, 1).unwrap().ch, '\u{b9}');
         assert_eq!(b.get(2, 1).unwrap().bg, t.navy);
         assert_eq!(b.get(2, 1).unwrap().fg, Color::Yellow);
         assert!(b.get(2, 1).unwrap().bold);
+        assert_eq!(b.get(3, 1).unwrap().fg, Color::DarkYellow);
         assert!(b.get(3, 1).unwrap().bold);
         // Acción pegada en blanco sobre navy (sin espacio intermedio).
         assert_eq!(b.get(4, 1).unwrap().ch, 'H');

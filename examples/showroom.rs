@@ -30,7 +30,7 @@ use g90tui::{
     radio_key, statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar, tuichart_draw,
     vscrollbar, window, Alignment, Attr, Backend, Buffer, Buttons, CalNav, CalendarPicker, Cell,
     ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color, CrosstermBackend, DriveType,
-    Dropdown, DropdownKey, EventCtx, FKeyDef, FileDialog, FileDialogKey, FocusManager, GlyphSet,
+    Dropdown, DropdownKey, EventCtx, FKeyBar, FileDialog, FileDialogKey, FocusManager, GlyphSet,
     GridTable, HandleEvent, HotAttrs, IconMode, InputField, InputKey, ListBox, MenuDef, MsgBoxKey,
     RadioNav, Rect, Screen, ShadowStyle, StatusBar, TabControl, TabPosition, TableDef, TableState,
     Theme, TuiChart, WindowOpts,
@@ -95,7 +95,7 @@ struct Show {
     flash: Option<usize>,
     focus: usize,
     message: String,
-    fkeys: Vec<FKeyDef>,
+    fkeys: FKeyBar,
     /// Vista de gráficos (F4) en vez del diálogo de controles.
     charts_view: bool,
     /// Modal de archivos abierto (captura todo el teclado).
@@ -354,15 +354,21 @@ impl Show {
             col_msg: 0,
             col_focus: 0,
             col_info: 0,
-            fkeys: vec![
-                FKeyDef::new("F1", "Help"),
-                FKeyDef::new("F2", "Qview"),
-                FKeyDef::new("F3", "Exit"),
-                FKeyDef::new("F4", "Graphs"),
-                FKeyDef::new("F5", "Copy"),
-                FKeyDef::new("F9", "Select"),
-                FKeyDef::new("F10", "Menu"),
-            ],
+            // Botonera con cupo: 7 teclas declaradas, 7 acciones en orden.
+            fkeys: {
+                let mut bar = FKeyBar::new(7);
+                bar.load_many(&[
+                    (1, "Help"),
+                    (2, "Qview"),
+                    (3, "Exit"),
+                    (4, "Graphs"),
+                    (5, "Copy"),
+                    (9, "Select"),
+                    (10, "Menu"),
+                ])
+                .expect("showroom: 7 acciones en 7 teclas");
+                bar
+            },
             fm: FocusManager::new(),
         };
         // Declaración de ámbitos (nombres = etiquetas de pestaña):
@@ -597,10 +603,9 @@ impl Show {
                 Cell::new(' ', Color::White, t.navy),
             );
             let mut fx = 1u16;
-            for f in &self.fkeys {
-                let num: u8 = f.key.trim_start_matches('F').parse().unwrap_or(0);
+            for s in &self.fkeys.funcs_loads {
                 // El badge ya trae su aire (2 celdas): avance directo.
-                fx = fx.saturating_add(fkey_badge(buf, fx, fy, num, &f.label, t));
+                fx = fx.saturating_add(fkey_badge(buf, fx, fy, s.num, &s.action, t));
                 if fx >= bounds.w {
                     break;
                 }

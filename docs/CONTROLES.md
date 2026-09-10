@@ -95,6 +95,7 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `Focus::{push, pop, top, is_modal}` + `Layer` | quién recibe teclas |
 | `desktop(screen)` → `{top, menu, work, fkeys, status}` | layout responsive |
 | `FKeyDef::new(tecla, etiqueta)` + `match_fkey(defs, key)` | c) qué hace cada función |
+| `FKeyBar::new(cant)` + `load(nº, acción)`/`load_many` + `draw` | botonera con cupo: `F¹` dos tonos (F `Yellow`, nº `DarkYellow`); de más → `FKeyError::Overflow` |
 
 ## Núcleo (`g90tui::core`, para avanzados)
 

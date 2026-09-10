@@ -18,7 +18,8 @@ pub mod widgets;
 pub use app::{
     centered as app_centered, desktop as app_desktop, draw_fkeys, map_key, map_key_event,
     match_fkey, menu_title_x, poll_event, popup as app_popup, test_app, to_crossterm, App,
-    AppEvent, AppKey, DesktopLayout, FKeyDef, Focus, Layer, ShellContent,
+    AppEvent, AppKey, DesktopLayout, FKeyBar, FKeyDef, FKeyError, FKeySlot, Focus, Layer,
+    ShellContent,
 };
 pub use core::{
     enter_screen, leave_screen, Attr, Backend, Buffer, Cell, Color, CrosstermBackend, DrawOp, Rect,

@@ -43,6 +43,7 @@ fn rgb_approx(c: Color) -> (f32, f32, f32) {
         Grey => (192.0, 192.0, 192.0),
         White => (255.0, 255.0, 255.0),
         Yellow => (255.0, 255.0, 0.0),
+        DarkYellow => (170.0, 85.0, 0.0), // marrón VGA
         Mint => (100.0, 255.0, 170.0),
         Red => (255.0, 0.0, 0.0),
         Green => (0.0, 128.0, 0.0),
@@ -184,6 +185,7 @@ mod tests {
         assert_eq!(darken_color(Color::Cyan, 0.50), Color::DarkGrey);
         assert_eq!(darken_color(Color::Cyan, 0.40), Color::DarkGrey);
         assert_eq!(darken_color(Color::Yellow, 0.50), Color::Grey);
+        assert_eq!(darken_color(Color::DarkYellow, 0.50), Color::DarkGrey);
         assert_eq!(darken_color(Color::Red, 0.50), Color::DarkGrey);
         assert_eq!(darken_color(Color::Green, 0.50), Color::DarkGrey);
         assert_eq!(darken_color(Color::Grey, 0.50), Color::DarkGrey);
@@ -207,6 +209,7 @@ mod tests {
             Color::Grey,
             Color::White,
             Color::Yellow,
+            Color::DarkYellow,
             Color::Mint,
             Color::Red,
             Color::Green,

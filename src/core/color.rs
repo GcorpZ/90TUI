@@ -18,8 +18,9 @@ pub enum Color {
     DarkGrey,
     Grey, // gris de selección / ventanas
     White,
-    Yellow, // hotkeys
-    Mint,   // verde menta de diálogos de progreso
+    Yellow,     // hotkeys
+    DarkYellow, // F-números Norton (marrón VGA)
+    Mint,       // verde menta de diálogos de progreso
     Red,
     Green,
 }
@@ -37,6 +38,7 @@ impl Color {
             Color::Grey => Cc::Grey,
             Color::White => Cc::White,
             Color::Yellow => Cc::Yellow,
+            Color::DarkYellow => Cc::DarkYellow,
             Color::Mint => Cc::Green,
             Color::Red => Cc::Red,
             Color::Green => Cc::DarkGreen,
@@ -99,6 +101,7 @@ mod tests {
             Color::Grey,
             Color::White,
             Color::Yellow,
+            Color::DarkYellow,
             Color::Mint,
             Color::Red,
             Color::Green,
