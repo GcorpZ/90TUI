@@ -35,7 +35,8 @@ pub use calendar::{
 };
 
 pub use chart::{
-    bar_heights, line_dots, pie_sectors, tuichart_draw, ChartKind, ChartPoint, TuiChart,
+    bar_heights, candle_draw, line_dots, pie_sectors, tuichart_draw, Candle, ChartKind, ChartPoint,
+    TuiChart,
 };
 pub use checkradio::{
     check_key, check_width, check_width_styled, checkbox_draw, radio_draw, radio_key, CheckItem,

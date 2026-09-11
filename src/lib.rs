@@ -35,7 +35,7 @@ pub use prim::{
 };
 pub use widgets::{
     apply_datemask, bar_fill_width, bar_heights, calendar_draw, calendar_field_width, calendar_key,
-    calendar_key_mod, calendar_popup_rect, check_key, check_width, check_width_styled,
+    calendar_key_mod, calendar_popup_rect, candle_draw, check_key, check_width, check_width_styled,
     checkbox_draw, civil_from_days, confirm_draw, confirm_key, confirm_layout, days_from_civil,
     days_in_month, dropdown_draw, dropdown_key, dropdown_overlay_rect, dropdown_size,
     filedialog_draw, filedialog_key, filedialog_layout, fkey_bar, fkey_bar_compact,
@@ -46,12 +46,12 @@ pub use widgets::{
     popup_size, progress_draw, progress_eighths, progress_fill, progressbar_draw, radio_draw,
     radio_key, statusbar_draw, tab_draw, tab_key, tab_viewport, table_draw, table_key,
     textarea_draw, textarea_key, textarea_visible, tuichart_draw, weekday, Alignment, BarInfo,
-    Buttons, CalNav, CalendarPicker, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle,
-    DialogKey, Dropdown, DropdownKey, EventCtx, FKeyStyle, Field, FieldKind, FileDialog,
-    FileDialogKey, FocusManager, FormKey, FormState, GlyphSet, GridNav, GridTable, HandleEvent,
-    Hyperlink, InputField, InputKey, ListBox, ListNav, MenuBarKey, MenuDef, MenuItem, MsgBoxKey,
-    PopupItem, PopupKey, ProgressBar, ProgressInfo, RadioNav, StatusBar, StatusColumn, Tab,
-    TabControl, TabNav, TabPosition, TableDef, TableState, TextArea, TextAreaKey, TuiChart,
+    Buttons, CalNav, CalendarPicker, Candle, ChartKind, ChartPoint, CheckItem, CheckNav,
+    CheckStyle, DialogKey, Dropdown, DropdownKey, EventCtx, FKeyStyle, Field, FieldKind,
+    FileDialog, FileDialogKey, FocusManager, FormKey, FormState, GlyphSet, GridNav, GridTable,
+    HandleEvent, Hyperlink, InputField, InputKey, ListBox, ListNav, MenuBarKey, MenuDef, MenuItem,
+    MsgBoxKey, PopupItem, PopupKey, ProgressBar, ProgressInfo, RadioNav, StatusBar, StatusColumn,
+    Tab, TabControl, TabNav, TabPosition, TableDef, TableState, TextArea, TextAreaKey, TuiChart,
     DEFAULT_DATEMASK, SUB_BLOCKS,
 };
 

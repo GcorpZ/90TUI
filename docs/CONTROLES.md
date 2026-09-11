@@ -75,7 +75,8 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `filedialog_draw(buf, screen, dlg, theme)` | `FileDialog::new(&ruta)` (`std::fs`, árbol + `ListBox`) | `filedialog_key` → `Accepted(PathBuf)` / `Cancelled`; Enter entra/elige, Bksp sube |
 | `textarea_draw(buf, rect, area, focused)` | `TextArea{lines, cursor, max_chars, fg/bg/active_bg, border_color, has_shadow}` | `textarea_key` → Enter parte línea, flechas/PgUp/PgDn navegan, scroll vertical |
 | `hyperlink_draw(buf, x, y, link)` | `Hyperlink{text, url}` | texto negrita coloreado; `osc8_sequence()` = `\x1b]8;;URL\x1b\\TEXTO\x1b]8;;\x1b\\` clickeable |
-| `tuichart_draw(buf, rect, chart)` | `TuiChart{kind: Bars3D/Line/Pie, series: [(label, value)]}` | barras `█`+`▒` 3D · líneas Bresenham sobre `VirtualCanvas` braille 2×4 (`prim::canvas`) · tarta sectorial + leyenda `%` |
+| `tuichart_draw(buf, rect, chart)` | `TuiChart{kind: Bars3D/Line/Pie, series: [(label, value)]}` | barras sólidas + eje Y · línea Bresenham/`VirtualCanvas` en Navy + ejes `┤┼─┴` + badge último valor · `Pie` = barra 100% apilada 2 filas + leyenda `■ A (50%)` |
+| `candle_draw(buf, rect, velas, bg)` | `Candle{open, high, low, close}` | velas OHLC: mecha `│` + cuerpo `█`, verde (cierre≥apertura) / rojo |
 | `tab_draw(buf, rect, tabs)` | `TabControl{tabs:[{label, fg, bg}], active, position: Top/Left}` | `tab_viewport(rect)` = área útil de página; `tab_key` (`←→`/`↑↓` circular); `active_scope()` nombra el ámbito de foco |
 | `grid_draw(buf, rect, grid)` | `GridTable{headers, rows, widths (0=auto)}` | anchos auto/fijos, fila resaltada, scroll vertical; `handle_event(EventCtx, key)` nativo (↑↓/PgUp/PgDn) |
 | `FocusManager::{add_scope, set_active, cycle_next, is_focusable}` | ámbitos por página (nombres = etiquetas de tab) | `Tab` global solo circula el ámbito activo; páginas ocultas fuera del teclado |
