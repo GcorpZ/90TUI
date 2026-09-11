@@ -133,9 +133,9 @@ fn layout(bounds: Rect) -> Layout {
     let file_panel = Rect::new(27, 3, 52, 19)
         .intersect(bounds)
         .unwrap_or(Rect::new(0, 0, 0, 0));
-    // Diálogo central 67x21 (+3 celdas de aire vs 64): los controles
-    // respiran y cada gráfico F4 gana 1 celda (= 2x4 micro-píxeles).
-    let dialog = Rect::centered_in(67, 21, bounds);
+    // Diálogo central 70x21 (+6 celdas de aire vs 64): los controles
+    // respiran y cada gráfico F4 gana 2 celdas (= 4x4 micro-píxeles).
+    let dialog = Rect::centered_in(70, 21, bounds);
     Layout {
         tree_panel,
         file_panel,
