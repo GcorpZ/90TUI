@@ -3,8 +3,9 @@
 //! Tres modos sobre la misma serie `(etiqueta, valor)`:
 //! 1. **Barras 3D** (`Bars3D`): bloques `\u{2588}` con profundidad simulada
 //!    en `\u{2592}` (borde lateral derecho + borde superior, 1 celda).
-//! 2. **Líneas** (`Line`): puntos Braille 2x4 por celda (alta precisión
-//!    aparente: `\u{2800}` + bits) sobre la polilínea interpolada.
+//! 2. **Líneas** (`Line`): polilínea rasterizada con Bresenham sobre el
+//!    `VirtualCanvas` sub-celular (2x4 micro-píxeles por celda,
+//!    `U+2800` + bits) — curva continua sin huecos.
 //! 3. **Tarta** (`Pie`): disco geométrico (`x²+y²<=r²` con aspecto 1:2)
 //!    por sectores, cada porción con un bloque sectorial
 //!    (`\u{2588}\u{2593}\u{2592}\u{2591}` rotando) + leyenda con `%`.
@@ -13,7 +14,7 @@
 //! `background_color`, `border_color`, `has_shadow`).
 
 use crate::core::{Attr, Buffer, Cell, Color, Rect, Theme};
-use crate::prim::{draw_text, fit_text, shadow, visible_len};
+use crate::prim::{draw_text, fit_text, shadow, visible_len, VirtualCanvas};
 
 const FULL: char = '\u{2588}';
 const SHADE_3D: char = '\u{2592}';
@@ -220,22 +221,14 @@ fn draw_bars(buf: &mut Buffer, plot: Rect, chart: &TuiChart) {
     }
 }
 
-// --- Líneas braille ---
+// --- Líneas braille (motor: VirtualCanvas + Bresenham) ---
 
-/// Bit braille para (dx 0..=1, dy 0..=3, dy=0 arriba).
-fn braille_bit(dx: usize, dy: usize) -> u8 {
-    const MAP: [[u8; 2]; 4] = [[0x01, 0x08], [0x02, 0x10], [0x04, 0x20], [0x40, 0x80]];
-    MAP[dy.min(3)][dx.min(1)]
-}
-
-fn braille_char(mask: u8) -> char {
-    char::from_u32(0x2800 + mask as u32).unwrap_or(' ')
-}
-
-/// Puntos (col de celda, fila de celda, máscara) de la polilínea.
-pub fn line_dots(values: &[f64], cols: u16, rows: u16) -> Vec<(u16, u16, u8)> {
+/// Lienzo con la serie rasterizada: valores → micro-píxeles (2x4 por
+/// celda, píxel virtual ~cuadrado) unidos con Bresenham.
+fn line_canvas(values: &[f64], cols: u16, rows: u16) -> VirtualCanvas {
+    let mut canvas = VirtualCanvas::new(cols, rows);
     if values.is_empty() || cols == 0 || rows == 0 {
-        return Vec::new();
+        return canvas;
     }
     let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
     let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -256,33 +249,25 @@ pub fn line_dots(values: &[f64], cols: u16, rows: u16) -> Vec<(u16, u16, u8)> {
             (dx, dy.min(dots_h - 1))
         })
         .collect();
-    // Rasteriza segmentos con interpolación lineal.
-    let mut cells = vec![vec![0u8; cols as usize]; rows as usize];
-    let mut dot = |dx: usize, dy: usize| {
-        let cx = dx / 2;
-        let cy = dy / 4;
-        if cx < cols as usize && cy < rows as usize {
-            cells[cy][cx] |= braille_bit(dx % 2, dy % 4);
-        }
-    };
+    // Segmentos con Bresenham (continuo, sin huecos).
     for w in pts.windows(2) {
-        let (x0, y0) = (w[0].0 as i32, w[0].1 as i32);
-        let (x1, y1) = (w[1].0 as i32, w[1].1 as i32);
-        let steps = (x1 - x0).abs().max((y1 - y0).abs()).max(1);
-        for s in 0..=steps {
-            let x = x0 + (x1 - x0) * s / steps;
-            let y = y0 + (y1 - y0) * s / steps;
-            dot(x as usize, y as usize);
-        }
+        canvas.draw_line(w[0].0, w[0].1, w[1].0, w[1].1);
     }
     if pts.len() == 1 {
-        dot(pts[0].0, pts[0].1);
+        canvas.set_pixel(pts[0].0, pts[0].1);
     }
+    canvas
+}
+
+/// Puntos (col de celda, fila de celda, máscara) de la polilínea.
+pub fn line_dots(values: &[f64], cols: u16, rows: u16) -> Vec<(u16, u16, u8)> {
+    let canvas = line_canvas(values, cols, rows);
     let mut out = Vec::new();
-    for (cy, row) in cells.iter().enumerate() {
-        for (cx, mask) in row.iter().enumerate() {
-            if *mask != 0 {
-                out.push((cx as u16, cy as u16, *mask));
+    for cy in 0..rows as usize {
+        for cx in 0..cols as usize {
+            let mask = canvas.cell_mask(cx, cy);
+            if mask != 0 {
+                out.push((cx as u16, cy as u16, mask));
             }
         }
     }
@@ -291,17 +276,12 @@ pub fn line_dots(values: &[f64], cols: u16, rows: u16) -> Vec<(u16, u16, u8)> {
 
 fn draw_line(buf: &mut Buffer, plot: Rect, chart: &TuiChart) {
     let values: Vec<f64> = chart.series.iter().map(|p| p.value).collect();
-    for (cx, cy, mask) in line_dots(&values, plot.w, plot.h) {
-        buf.set(
-            plot.x.saturating_add(cx),
-            plot.y.saturating_add(cy),
-            Cell::new(
-                braille_char(mask),
-                chart.accent_color,
-                chart.background_color,
-            ),
-        );
-    }
+    line_canvas(&values, plot.w, plot.h).render_to_buffer(
+        buf,
+        plot,
+        chart.accent_color,
+        chart.background_color,
+    );
 }
 
 // --- Tarta ---
@@ -387,6 +367,10 @@ fn draw_pie(buf: &mut Buffer, plot: Rect, chart: &TuiChart) {
 mod tests {
     use super::*;
 
+    fn braille_char(mask: u8) -> char {
+        char::from_u32(0x2800 + mask as u32).unwrap_or(' ')
+    }
+
     fn sample() -> Vec<ChartPoint> {
         vec![
             ChartPoint::new("Ene", 10.0),
@@ -449,6 +433,21 @@ mod tests {
             .filter(|(x, y)| (0x2800..=0x28FF).contains(&(b.get(*x, *y).unwrap().ch as u32)))
             .count();
         assert!(n > 2);
+    }
+
+    #[test]
+    fn line_is_continuous_without_gaps() {
+        // Diagonal empinada: Bresenham toca todas las filas del plot.
+        let dots = line_dots(&[0.0, 100.0], 6, 6);
+        for row in 0..6u16 {
+            assert!(
+                dots.iter().any(|(_, cy, _)| *cy == row),
+                "fila {row} vacía en diagonal"
+            );
+        }
+        // Un solo valor = un solo dot.
+        assert_eq!(line_dots(&[5.0], 6, 6).len(), 1);
+        assert!(line_dots(&[], 6, 6).is_empty());
     }
 
     #[test]

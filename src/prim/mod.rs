@@ -4,6 +4,7 @@
 //! y los eventos llegan en Fase 5 (`widgets`) y Fase 6 (`app`).
 
 pub mod button;
+pub mod canvas;
 pub mod icons;
 pub mod icons20;
 pub mod label;
@@ -17,6 +18,7 @@ pub use button::{
     button, button_draw, button_draw_ex, button_draw_opts, button_ex, button_width, ButtonOpts,
     BUTTON_MIN_WIDTH,
 };
+pub use canvas::VirtualCanvas;
 pub use icons::{drive, folder, win_close, win_min, FolderGlyphs};
 pub use icons20::{
     drive_badge, file_badge, file_fg, fkey_badge, folder_badge, win_close_framed, DriveType,

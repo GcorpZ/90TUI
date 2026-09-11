@@ -31,7 +31,7 @@ pub use prim::{
     folder, folder_badge, hot_key_of, hsep, parse_hotkey, shadow, shadow_offset, shadow_solid,
     shadow_stipple, shadow_styled, status_bar, top_bar, visible_len, vscrollbar, win_close,
     win_close_framed, win_min, window, BorderStyle, ButtonOpts, DriveType, FolderGlyphs, HotAttrs,
-    IconMode, ShadowStyle, WindowOpts, BUTTON_MIN_WIDTH,
+    IconMode, ShadowStyle, VirtualCanvas, WindowOpts, BUTTON_MIN_WIDTH,
 };
 pub use widgets::{
     apply_datemask, bar_fill_width, bar_heights, calendar_draw, calendar_field_width, calendar_key,
