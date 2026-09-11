@@ -7,8 +7,10 @@
 
 use crossterm::event::KeyCode;
 
-use crate::core::{Buffer, Cell, Rect, Theme};
-use crate::prim::{button, button_width, draw_text, visible_len, window, WindowOpts};
+use crate::core::{Buffer, Rect, Theme};
+use crate::prim::{
+    button_ex, button_width, draw_text, visible_len, window, ButtonOpts, WindowOpts,
+};
 
 /// Configuración de botones del modal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -102,15 +104,18 @@ pub fn msgbox_draw(
             r.x.saturating_add(r.w.saturating_sub(visible_len(line)) / 2);
         draw_text(buf, qx, y, line, theme.dialog_attr());
     }
-    // Botones de 1 fila con sombra `▀` (el foco: fondo negro en 1ª celda).
+    // Botones de 1 fila con sombra `▀`: el foco lo lleva el propio
+    // botón encendido (`focused`), sin manchas ni marcas externas.
     for (i, (b, br)) in labels.iter().zip(rects.iter()).enumerate() {
-        button(buf, br.x, br.y, b, theme);
-        if i == selected.min(labels.len().saturating_sub(1)) {
-            buf.fill_rect(
-                Rect::new(br.x, br.y, 1, 1),
-                Cell::new(' ', crate::core::Color::White, crate::core::Color::Black),
-            );
-        }
+        let focused = i == selected.min(labels.len().saturating_sub(1));
+        button_ex(
+            buf,
+            br.x,
+            br.y,
+            b,
+            theme,
+            ButtonOpts::default().focused(focused),
+        );
     }
 }
 
@@ -168,28 +173,35 @@ mod tests {
     }
 
     #[test]
-    fn draws_message_and_one_row_buttons() {
+    fn draws_message_and_focused_button() {
+        use crate::core::Color;
         let t = Theme::clipper();
         let mut b = Buffer::blank(80, 25, t.desktop);
         let screen = Rect::new(0, 0, 80, 25);
         msgbox_draw(&mut b, screen, "AVISO", "Hola", &Buttons::Ok, 0, t);
         let (r, _) = msgbox_layout("Hola", &Buttons::Ok, screen);
-        // Ventana menta + mensaje centrado + botón teal de 1 fila.
+        // Ventana menta + mensaje centrado + botón ENFOCADO (azul, no teal).
         assert_eq!(b.get(r.x + 2, r.y + 2).unwrap().bg, t.dialog);
-        let mut saw_button = false;
+        let mut saw_focus = false;
         let mut saw_shadow = false;
+        let mut saw_stain = false;
         for y in r.y..r.bottom() {
             for x in r.x..r.right() {
                 let c = b.get(x, y).unwrap();
-                if c.bg == t.button_bg {
-                    saw_button = true;
+                if c.bg == Color::Blue {
+                    saw_focus = true;
                 }
                 if c.ch == '\u{2580}' {
                     saw_shadow = true;
                 }
+                if c.bg == Color::Black && c.ch == ' ' {
+                    saw_stain = true;
+                }
             }
         }
-        assert!(saw_button && saw_shadow);
+        assert!(saw_focus, "botón con foco luminoso");
+        assert!(saw_shadow);
+        assert!(!saw_stain, "sin mancha negra de foco");
     }
 
     #[test]

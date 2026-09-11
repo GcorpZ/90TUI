@@ -27,9 +27,9 @@ no RGB): `foreground_color` / `background_color` / `border_color` /
 | `shadow(buf, rect, theme)` | buffer, rect, tema | — | sombra neutra (offset 2,1): conserva glifo, atenúa fg/bg por luminancia con `darken_color` (jamás tinte) + `dim` ANSI |
 | `shadow_solid / shadow_stipple / shadow_styled / shadow_offset` | + `dx,dy` / `ShadowStyle` | — | variantes (botones = sólida) |
 | `Cell.dim` / `Attr::faint` | flag | — | `\x1b[2m` real en el backend |
-| `button(buf, x, y, label, theme)` | coords, texto | `u16` ancho | botón teal 1 fila, padding 2 por lado (`  TEXTO  `, mín. 10); sombra media celda con fondo REAL detectado: lateral `▄` + inferior `▀`, tinta negra |
-| `button_draw(..., pressed)` | + `bool` | `u16` ancho | hundido (+1,+1, sin sombra) si `pressed` |
-| `button_ex / button_draw_ex / button_draw_opts` | + `ButtonOpts` | `u16` ancho | estilo global (`foreground/background/border_color`, `has_shadow`) |
+| `button(buf, x, y, label, theme)` | coords, texto (`&` = hotkey, no se dibuja) | `u16` ancho | botón 1 fila, padding 2 por lado (`  TEXTO  `, mín. 10); hotkey amarilla (1ª letra si no hay `&`); sombra media celda con fondo REAL detectado: lateral `▄` + inferior `▀`, tinta negra |
+| `button_draw(..., pressed)` | + `bool` | `u16` ancho | hundido (+1,+1, sin sombra, fondo `Navy`) si `pressed` |
+| `button_ex / button_draw_ex / button_draw_opts` | + `ButtonOpts` | `u16` ancho | estilo global (`foreground/background/border_color`, `has_shadow`, `focused` = fondo `Blue` + negrita + hotkey amarilla bold, sin marcas externas) |
 | `button_width(label)` | `&str` | `u16` | texto+4 con mínimo 10 |
 | `BUTTON_MIN_WIDTH` | const `= 10` | — | ancho mínimo de botón |
 | `draw_hot_label(buf, x, y, s, base, hot)` | texto con `&` | `u16` ancho | etiqueta con hotkey |

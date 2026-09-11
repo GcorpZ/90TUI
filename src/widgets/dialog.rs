@@ -5,7 +5,9 @@
 use crossterm::event::KeyCode;
 
 use crate::core::{Buffer, Rect, Theme};
-use crate::prim::{button, button_width, draw_text, hot_key_of, visible_len, window, WindowOpts};
+use crate::prim::{
+    button_ex, button_width, draw_text, hot_key_of, visible_len, window, ButtonOpts, WindowOpts,
+};
 
 /// Calcula rect del diálogo + rects de cada botón (para futuro mouse).
 /// `buttons` admite `&` (ej `"&Si"`, `"&No"`).
@@ -28,8 +30,8 @@ pub fn confirm_layout(question: &str, buttons: &[String], screen: Rect) -> (Rect
     (r, rects)
 }
 
-/// Dibuja pregunta + botones con `selected` resaltado (botón = mismo
-/// teal; el foco se marca invirtiendo a negro, ver `focused_button`).
+/// Dibuja pregunta + botones con `selected` en foco luminoso (el botón
+/// encendido comunica el foco, sin manchas ni marcas externas).
 pub fn confirm_draw(
     buf: &mut Buffer,
     screen: Rect,
@@ -47,20 +49,17 @@ pub fn confirm_draw(
     let qx =
         r.x.saturating_add(r.w.saturating_sub(visible_len(question)) / 2);
     draw_text(buf, qx, r.y + 2, question, theme.dialog_attr());
-    // Botones: el seleccionado lleva fondo negro (foco visible).
+    // Botones: el seleccionado lleva `focused = true`.
     let (_, rects) = confirm_layout(question, buttons, screen);
     for (i, (b, br)) in buttons.iter().zip(rects.iter()).enumerate() {
-        if i == selected {
-            let w = button(buf, br.x, br.y, b, theme);
-            // Mancha de foco: primera celda en negro.
-            let _ = w;
-            buf.fill_rect(
-                Rect::new(br.x, br.y, 1, 1),
-                crate::core::Cell::new(' ', crate::core::Color::White, crate::core::Color::Black),
-            );
-        } else {
-            button(buf, br.x, br.y, b, theme);
-        }
+        button_ex(
+            buf,
+            br.x,
+            br.y,
+            b,
+            theme,
+            ButtonOpts::default().focused(i == selected.min(buttons.len().saturating_sub(1))),
+        );
     }
 }
 

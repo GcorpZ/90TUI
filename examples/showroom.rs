@@ -24,17 +24,18 @@ use std::time::{Duration, Instant};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
 use g90tui::{
-    button_draw, button_width, calendar_draw, calendar_field_width, calendar_key_mod, check_key,
-    draw_text, drive_badge, dropdown_draw, dropdown_key, enter_screen, file_fg, filedialog_draw,
-    filedialog_key, fkey_badge, folder_badge, grid_draw, input_draw, input_key, leave_screen,
-    list_key, listbox_draw, listbox_key, menubar_draw, menubar_key, msgbox_draw, msgbox_key,
-    progressbar_draw, radio_key, statusbar_draw, tab_draw, tab_key, table_draw, table_key, top_bar,
-    tuichart_draw, vscrollbar, window, Alignment, Attr, Backend, Buffer, Buttons, CalNav,
-    CalendarPicker, Cell, ChartKind, ChartPoint, CheckItem, CheckNav, CheckStyle, Color,
-    CrosstermBackend, DriveType, Dropdown, DropdownKey, EventCtx, FKeyBar, FileDialog,
-    FileDialogKey, FocusManager, GlyphSet, GridTable, HandleEvent, HotAttrs, IconMode, InputField,
-    InputKey, ListBox, MenuBarKey, MenuDef, MsgBoxKey, RadioNav, Rect, Screen, ShadowStyle,
-    StatusBar, TabControl, TabPosition, TableDef, TableState, Theme, TuiChart, WindowOpts,
+    button_draw, button_ex, button_width, calendar_draw, calendar_field_width, calendar_key_mod,
+    check_key, draw_text, drive_badge, dropdown_draw, dropdown_key, enter_screen, file_fg,
+    filedialog_draw, filedialog_key, fkey_badge, folder_badge, grid_draw, input_draw, input_key,
+    leave_screen, list_key, listbox_draw, listbox_key, menubar_draw, menubar_key, msgbox_draw,
+    msgbox_key, progressbar_draw, radio_key, statusbar_draw, tab_draw, tab_key, table_draw,
+    table_key, top_bar, tuichart_draw, vscrollbar, window, Alignment, Attr, Backend, Buffer,
+    ButtonOpts, Buttons, CalNav, CalendarPicker, Cell, ChartKind, ChartPoint, CheckItem, CheckNav,
+    CheckStyle, Color, CrosstermBackend, DriveType, Dropdown, DropdownKey, EventCtx, FKeyBar,
+    FileDialog, FileDialogKey, FocusManager, GlyphSet, GridTable, HandleEvent, HotAttrs, IconMode,
+    InputField, InputKey, ListBox, MenuBarKey, MenuDef, MsgBoxKey, RadioNav, Rect, Screen,
+    ShadowStyle, StatusBar, TabControl, TabPosition, TableDef, TableState, Theme, TuiChart,
+    WindowOpts,
 };
 
 /// (prefijo de rama, nombre, abierta?) — el icono lo pinta `folder_badge()`.
@@ -809,6 +810,8 @@ impl Show {
             } // fin página General
 
             // Botones (padding 2, centrados): OK · Cancel · Abrir… (MsgBox).
+            // Foco por luminancia: solo el botón con `btn_sel` cuando el
+            // grupo tiene el foco (Tab/←→); el OK arranca como defecto.
             let bw_ok = button_width("OK");
             let bw_cancel = button_width("Cancel");
             let bw_open = button_width("Abrir…");
@@ -816,12 +819,22 @@ impl Show {
             let bx0 = d.x + (d.w.saturating_sub(total)) / 2;
             let bx1 = bx0 + bw_ok + 2;
             let bx2 = bx1 + bw_cancel + 2;
-            button_draw(buf, bx0, d.y + 16, "OK", t, flash == Some(0));
-            button_draw(buf, bx1, d.y + 16, "Cancel", t, flash == Some(1));
-            button_draw(buf, bx2, d.y + 16, "Abrir…", t, flash == Some(2));
-            if focus == 10 {
-                let mx = [bx0, bx1, bx2][btn_sel.min(2)] - 1;
-                draw_text(buf, mx, d.y + 16, "►", Attr::bold(Color::Red, t.dialog));
+            for (i, (bx, label)) in [(bx0, "OK"), (bx1, "Cancel"), (bx2, "Abrir…")]
+                .iter()
+                .enumerate()
+            {
+                button_ex(
+                    buf,
+                    *bx,
+                    d.y + 16,
+                    label,
+                    t,
+                    ButtonOpts::default().focused(focus == 10 && btn_sel.min(2) == i),
+                );
+                // Hundido al hacer clic (cubre el foco un instante).
+                if flash == Some(i) {
+                    button_draw(buf, *bx, d.y + 16, label, t, true);
+                }
             }
             // Etiqueta de foco actual (ancho en celdas, con saturación).
             let fl = format!("[{}]", FOCUS_NAMES[focus]);

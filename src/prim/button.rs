@@ -1,4 +1,4 @@
-//! Botones teal con sombra CUA por celdas + estado presionado intrínseco.
+//! Botones con foco por luminancia + hotkey CUA + sombra por celdas.
 //!
 //! Geometría de sombra (todo en celdas, botón en `(x, y)`, `W` x `H=1`):
 //! * columna derecha: `(x+W, y)` .. `(x+W, y+H)` (incluye la esquina),
@@ -11,19 +11,37 @@
 //! lo supera, 2 celdas de margen por lado. Al presionarse, el botón
 //! **baja 1 y se corre 1 a la derecha**, tapando su sombra.
 //!
+//! Hotkey (acelerador CUA): `&` marca la siguiente letra (`"&OK"` pinta
+//! `OK` con la `O` en amarillo, el `&` jamás se dibuja); sin `&`, la
+//! primera letra alfabética es el hotkey (ver `parse_hotkey`).
+//!
+//! Estados (el foco lo comunica el propio botón encendido, NUNCA marcas
+//! externas como `►` ni manchas fuera de `x..x+w`):
+//! * reposo: fondo `background_color`/`theme.button_bg`, texto normal,
+//!   hotkey en amarillo atenuado.
+//! * foco (`focused`): fondo `Blue` brillante, texto en negrita, hotkey
+//!   en amarillo brillante + negrita.
+//! * presionado (`pressed`): +1,+1 sin sombra, fondo `Navy` oscuro.
+//!
+//! Nota: el motor es ANSI-16 sin `Rgb`; este es el mapeo fiel de la
+//! paleta TrueColor pedida (azul medio, celeste brillante, azul oscuro).
+//!
 //! Estilo global: `ButtonOpts` expone `foreground_color`,
-//! `background_color`, `border_color` (`None` = tema) y `has_shadow`.
+//! `background_color`, `border_color` (`None` = tema), `has_shadow` y
+//! `focused` (el `foreground_color` explícito se respeta en los 3 estados).
 
 use crate::core::{Attr, Buffer, Cell, Color, Theme, WidgetStyle};
 
-use super::label::visible_len;
+use super::label::{parse_hotkey, visible_len};
 
 /// Ancho mínimo de un botón (texto corto centrado con relleno).
 pub const BUTTON_MIN_WIDTH: u16 = 10;
 
-/// Configuración de un botón (los 4 parámetros globales; `None` = tema).
-/// `border_color`: `Some` pinta corchetes `[ ]` integrados en la única
-/// fila (sin filas extra); `None` = bloque sólido.
+/// Configuración de un botón (los 4 parámetros globales + foco;
+/// `None` = tema). `border_color`: `Some` pinta corchetes `[ ]`
+/// integrados en la única fila (sin filas extra); `None` = bloque sólido.
+/// `focused`: el botón con foco del teclado (fondo brillante + negrita,
+/// sin marcas externas).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ButtonOpts {
     pub foreground_color: Option<Color>,
@@ -31,6 +49,8 @@ pub struct ButtonOpts {
     pub border_color: Option<Color>,
     /// Si es `false`, no se pinta sombra.
     pub has_shadow: bool,
+    /// Botón con foco (luminancia + hotkey brillante).
+    pub focused: bool,
 }
 
 impl Default for ButtonOpts {
@@ -40,6 +60,7 @@ impl Default for ButtonOpts {
             background_color: None,
             border_color: None,
             has_shadow: true,
+            focused: false,
         }
     }
 }
@@ -59,7 +80,14 @@ impl ButtonOpts {
             background_color: Some(style.background_color),
             border_color: Some(style.border_color),
             has_shadow: style.has_shadow,
+            focused: false,
         }
+    }
+
+    /// Cadena con el botón con foco (el que manda el Tab del diálogo).
+    pub fn focused(mut self, focused: bool) -> Self {
+        self.focused = focused;
+        self
     }
 }
 
@@ -70,11 +98,35 @@ pub fn button_width(label: &str) -> u16 {
     text.saturating_add(4).max(BUTTON_MIN_WIDTH)
 }
 
-fn resolve_attr(theme: Theme, opts: ButtonOpts) -> Attr {
-    Attr::bold(
-        opts.foreground_color.unwrap_or(theme.button_fg),
-        opts.background_color.unwrap_or(theme.button_bg),
-    )
+/// Par de atributos según estado: texto base + hotkey.
+struct ButtonPaint {
+    base: Attr,
+    hot: Attr,
+}
+
+fn resolve_paint(theme: Theme, opts: ButtonOpts, pressed: bool) -> ButtonPaint {
+    // El estado manda sobre el fondo (el fg explícito se respeta siempre).
+    let bg = if pressed {
+        Color::Navy
+    } else if opts.focused {
+        Color::Blue
+    } else {
+        opts.background_color.unwrap_or(theme.button_bg)
+    };
+    let fg = opts.foreground_color.unwrap_or(theme.button_fg);
+    let lit = opts.focused && !pressed;
+    ButtonPaint {
+        base: if lit {
+            Attr::bold(fg, bg)
+        } else {
+            Attr::new(fg, bg)
+        },
+        hot: if lit {
+            Attr::bold(Color::Yellow, bg)
+        } else {
+            Attr::new(Color::Yellow, bg)
+        },
+    }
 }
 
 /// Dibuja el botón en reposo en (x, y). Devuelve el ancho ocupado.
@@ -160,7 +212,7 @@ pub fn button_draw_opts(
         (x, y)
     };
 
-    let attr = resolve_attr(theme, opts);
+    let paint = resolve_paint(theme, opts, pressed);
 
     // ----------------------------------------------------------------
     // FILA 1: CUERPO DEL BOTÓN + SOMBRA LATERAL MITAD INFERIOR
@@ -168,18 +220,25 @@ pub fn button_draw_opts(
     // Pinar el rectángulo del botón (1 fila de alto)
     buf.fill_rect(
         crate::core::Rect::new(bx, by, w, 1),
-        Cell::with_attr(' ', attr),
+        Cell::with_attr(' ', paint.base),
     );
 
-    // Centrar y renderizar el texto dentro de esa única fila
+    // Texto limpio centrado (`&` = marca hotkey, jamás se dibuja).
+    let (clean, hot) = parse_hotkey(label);
+    let hot_idx = hot.map(|(i, _)| i);
     let text = visible_len(label);
     let start = bx.saturating_add(w.saturating_sub(text) / 2);
     let mut cx = start;
-    for ch in label.chars() {
+    for (i, ch) in clean.chars().enumerate() {
         if cx >= bx.saturating_add(w) {
             break;
         }
-        buf.set(cx, by, Cell::with_attr(ch, attr));
+        let a = if Some(i) == hot_idx {
+            paint.hot
+        } else {
+            paint.base
+        };
+        buf.set(cx, by, Cell::with_attr(ch, a));
         cx = cx.saturating_add(1);
     }
 
@@ -187,11 +246,11 @@ pub fn button_draw_opts(
     // 2. BORDE INTEGRADO OPCIONAL (Solo si se requiere una línea fina, NO celdas vacías extras)
     if let Some(_border) = opts.border_color {
         // Si necesitas un recuadro de línea fina estilo [ OK ], pinta los corchetes en los extremos
-        buf.set(bx, by, Cell::with_attr('[', attr));
+        buf.set(bx, by, Cell::with_attr('[', paint.base));
         buf.set(
             bx.saturating_add(w).saturating_sub(1),
             by,
-            Cell::with_attr(']', attr),
+            Cell::with_attr(']', paint.base),
         );
     }
 
@@ -336,8 +395,8 @@ mod tests {
         button_draw(&mut b, 2, 1, "OK", t, true);
         // El bloque bajó: la O ahora está en (3+4?...): centrada en (3,2).
         assert_eq!(b.get(3 + (10 - 2) / 2, 2).unwrap().ch, 'O');
-        // ...y tapó su propia sombra (ya no hay negro debajo del bloque).
-        assert_eq!(b.get(3, 2).unwrap().bg, t.button_bg);
+        // ...y tapó su propia sombra con fondo oscuro (ya no hay negro).
+        assert_eq!(b.get(3, 2).unwrap().bg, Color::Navy);
     }
 
     #[test]
@@ -349,6 +408,7 @@ mod tests {
             background_color: Some(Color::Navy),
             border_color: None,
             has_shadow: false,
+            focused: false,
         };
         button_ex(&mut b, 2, 1, "OK", t, opts);
         assert_eq!(b.get(2, 1).unwrap().bg, Color::Navy);
@@ -396,5 +456,71 @@ mod tests {
         assert_eq!(b.get(2 + 10 - 1, 2).unwrap().ch, ']');
         assert_eq!(b.get(2 + (10 - 2) / 2, 2).unwrap().ch, 'O');
         assert_eq!(b.get(2, 1).unwrap().bg, t.desktop); // sin fila extra
+    }
+
+    #[test]
+    fn ampersand_marks_hotkey_and_is_never_drawn() {
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(30, 6, t.desktop);
+        let w = button(&mut b, 2, 1, "&Cancelar", t);
+        // "Cancelar" (8) + 4 = 12; sin `&` en ninguna celda del botón.
+        assert_eq!(w, 12);
+        for x in 2..2 + w {
+            assert_ne!(b.get(x, 1).unwrap().ch, '&', "& en {x}");
+        }
+        // Hotkey `C` en amarillo atenuado (reposo: sin negrita).
+        let start = 2 + (12 - 8) / 2;
+        let c = b.get(start, 1).unwrap();
+        assert_eq!(c.ch, 'C');
+        assert_eq!(c.fg, Color::Yellow);
+        assert!(!c.bold);
+        assert_eq!(c.bg, t.button_bg);
+    }
+
+    #[test]
+    fn first_alpha_is_default_hotkey() {
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(30, 6, t.desktop);
+        button(&mut b, 2, 1, "OK", t);
+        let start = 2 + (10 - 2) / 2;
+        assert_eq!(b.get(start, 1).unwrap().ch, 'O');
+        assert_eq!(b.get(start, 1).unwrap().fg, Color::Yellow);
+        assert_eq!(b.get(start + 1, 1).unwrap().fg, t.button_fg);
+    }
+
+    #[test]
+    fn focused_lights_up_blue_and_bold() {
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(30, 6, t.desktop);
+        let opts = ButtonOpts::default().focused(true);
+        button_ex(&mut b, 2, 1, "&OK", t, opts);
+        // Fondo brillante + texto en negrita + hotkey amarilla bold.
+        assert_eq!(b.get(2, 1).unwrap().bg, Color::Blue);
+        let start = 2 + (10 - 2) / 2;
+        let o = b.get(start, 1).unwrap();
+        assert_eq!((o.ch, o.fg, o.bg), ('O', Color::Yellow, Color::Blue));
+        assert!(o.bold);
+        let k = b.get(start + 1, 1).unwrap();
+        assert_eq!(k.ch, 'K');
+        assert!(k.bold);
+        assert_eq!(k.bg, Color::Blue);
+        // Reposo al lado: teal sin negrita (contraste visible).
+        button(&mut b, 16, 1, "OK", t);
+        assert_eq!(b.get(16, 1).unwrap().bg, t.button_bg);
+        assert!(!b.get(16, 1).unwrap().bold);
+    }
+
+    #[test]
+    fn pressed_darkens_navy_and_stays_inside() {
+        let t = Theme::clipper();
+        let mut b = Buffer::blank(30, 6, t.desktop);
+        let w = button_draw(&mut b, 2, 1, "OK", t, true);
+        // Hundido +1,+1 con fondo oscuro, sin sombra debajo.
+        assert_eq!(b.get(3 + (10 - 2) / 2, 2).unwrap().ch, 'O');
+        assert_eq!(b.get(3, 2).unwrap().bg, Color::Navy);
+        // Geometría estricta: nada a la izquierda del botón (x-1 intacto).
+        assert_eq!(b.get(1, 1).unwrap().bg, t.desktop);
+        assert_eq!(b.get(1, 2).unwrap().bg, t.desktop);
+        assert_eq!(w, BUTTON_MIN_WIDTH);
     }
 }
