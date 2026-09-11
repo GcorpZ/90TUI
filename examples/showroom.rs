@@ -246,10 +246,20 @@ impl Show {
             files: TableDef::new(&[("Nombre", 12), ("Ext", 5), ("Tamaño", 9)], rows),
             files_state: TableState::new(),
             dropdown: Dropdown::new("Depto", &["Ventas", "Compras", "Gerencia", "Soporte"]),
-            input_name: InputField::new(18),
+            // Campos y lista heredan el azul de la tarjeta (sin parches).
+            input_name: {
+                let mut f = InputField::new(18);
+                f.background_color = theme.popup;
+                f.foreground_color = theme.popup_text;
+                f.active_background_color = theme.popup;
+                f
+            },
             input_pass: {
                 let mut p = InputField::new(12);
                 p.mask = Some('*');
+                p.background_color = theme.popup;
+                p.foreground_color = theme.popup_text;
+                p.active_background_color = theme.popup;
                 p
             },
             cal: CalendarPicker::current(),
@@ -261,16 +271,21 @@ impl Show {
                 CheckItem::new("&Expert Mode", false),
             ],
             check_focus: 0,
-            listbox: ListBox::new(&[
-                "CONFIG.SYS",
-                "AUTOEXEC.BAT",
-                "COMMAND.COM",
-                "README.TXT",
-                "DATA.DBF",
-                "INDEX.NTX",
-                "BACKUP.ZIP",
-                "LOG.TXT",
-            ]),
+            listbox: {
+                let mut lb = ListBox::new(&[
+                    "CONFIG.SYS",
+                    "AUTOEXEC.BAT",
+                    "COMMAND.COM",
+                    "README.TXT",
+                    "DATA.DBF",
+                    "INDEX.NTX",
+                    "BACKUP.ZIP",
+                    "LOG.TXT",
+                ]);
+                lb.background_color = theme.popup;
+                lb.foreground_color = theme.popup_text;
+                lb
+            },
             progress_pct: 42,
             btn_sel: 0,
             flash: None,
@@ -279,7 +294,11 @@ impl Show {
             charts_view: false,
             file_dialog: None,
             msgbox_sel: None,
-            tabs: TabControl::new(&["General", "Inventario"], TabPosition::Top, theme),
+            tabs: TabControl::new(
+                &["General", "Inventario", "Archivos"],
+                TabPosition::Top,
+                theme,
+            ),
             grid: GridTable::new(
                 &["Ref", "Descripción", "Cant.", "Costo"],
                 vec![
@@ -382,10 +401,11 @@ impl Show {
             fm: FocusManager::new(),
         };
         // Declaración de ámbitos (nombres = etiquetas de pestaña):
-        // General ve todo; Inventario solo su grid + comunes.
+        // General = formulario; Inventario = grid; Archivos = lista+opciones.
         show.fm
-            .add_scope("General", &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+            .add_scope("General", &[0, 1, 2, 3, 4, 5, 9, 10, 11, 12]);
         show.fm.add_scope("Inventario", &[0, 1, 8, 9, 10, 11]);
+        show.fm.add_scope("Archivos", &[0, 1, 6, 7, 8, 9, 10, 11]);
         show.fm.set_active("General");
         show
     }
@@ -635,179 +655,189 @@ impl Show {
             wo.controls = true;
             window(buf, d, &wo, t);
             let base = t.dialog_attr();
-            let hot = Attr::bold(Color::Red, t.dialog);
-            let cstyle = CheckStyle::new(HotAttrs { base, hot }, GlyphSet::modern());
-            // Tira de pestañas sobre la zona de controles (página 0 = General,
-            // página 1 = Inventario). En modo Left el contenido se corre.
-            let tab_box = Rect::new(d.x + 2, d.y + 1, d.w.saturating_sub(4), 14);
-            let vp = tab_draw(buf, tab_box, &self.tabs);
-            // Orígenes derivados del viewport (el offset de la tira lo
-            // calcula la librería en `tab_viewport`, no el demo).
-            let lx = vp.x.saturating_add(1);
-            let rx = vp.x.saturating_add(vp.w / 2).saturating_add(1);
-            let label_attr = Attr::new(Color::Black, t.dialog);
-            let dd_rect = Rect::new(lx.saturating_add(8), d.y + 2, 20, 1);
-            let cal_rect = Rect::new(
-                lx.saturating_add(8),
-                d.y + 6,
-                calendar_field_width(&self.cal),
-                1,
+            // Tarjeta archivadora: orejetas + marco CP437; los hijos viven
+            // en el viewport interior con el azul de la tarjeta (sin parches
+            // verdes: nada de `window_bg`/`dialog` dentro de la tarjeta).
+            let tab_rect = Rect::new(d.x + 2, d.y + 1, d.w.saturating_sub(4), 13);
+            let vp = tab_draw(buf, tab_rect, &self.tabs);
+            let tab_bg = self.tabs.background_color;
+            let label_attr = Attr::new(Color::White, tab_bg);
+            let mark_attr = Attr::bold(Color::Red, tab_bg);
+            let cstyle = CheckStyle::new(
+                HotAttrs {
+                    base: Attr::new(Color::White, tab_bg),
+                    hot: Attr::bold(Color::Red, tab_bg),
+                },
+                GlyphSet::modern(),
             );
+            // ► de la tira (columna del marco: no pisa orejetas ni caja).
             if focus == 11 {
                 let (mx, my) = if self.tabs.position == TabPosition::Left {
-                    (tab_box.x, tab_box.y + 1 + self.tabs.active as u16)
+                    (tab_rect.x, tab_rect.y + 1 + self.tabs.active as u16)
                 } else {
-                    (tab_box.x, tab_box.y)
+                    (tab_rect.x, tab_rect.y)
                 };
-                draw_text(buf, mx, my, "►", Attr::bold(Color::Red, t.dialog));
+                draw_text(buf, mx, my, "►", mark_attr);
             }
 
-            if self.tabs.active == 1 {
-                // Página Inventario: GridTable con scroll en el viewport.
-                let gr = Rect::new(vp.x, vp.y, vp.w, vp.h.min(12));
-                grid_draw(buf, gr, &self.grid);
+            // Páginas estrictamente aisladas: `match tabs.active` pinta SOLO
+            // la página visible, todo relativo al viewport y en azul tarjeta.
+            match self.tabs.active {
+                1 => {
+                    // Inventario: tabla de stock en el viewport.
+                    let gr = Rect::new(vp.x, vp.y, vp.w, vp.h.saturating_sub(1));
+                    grid_draw(buf, gr, &self.grid);
+                    draw_text(
+                        buf,
+                        vp.x,
+                        vp.bottom().saturating_sub(1),
+                        "↑↓ mueve · PgUp/PgDn página · Tab cambia",
+                        label_attr,
+                    );
+                    if focus == 8 {
+                        let grow = (self.grid.selected.saturating_sub(self.grid.top)) as u16;
+                        if grow < gr.h {
+                            draw_text(buf, vp.x, vp.y + grow, "►", mark_attr);
+                        }
+                    }
+                }
+                2 => {
+                    // Archivos: lista + opciones, solo dentro del viewport.
+                    draw_text(buf, vp.x + 2, vp.y, "Archivos:", label_attr);
+                    let lb_rect = Rect::new(
+                        vp.x + 2,
+                        vp.y + 1,
+                        28.min(vp.w.saturating_sub(4)),
+                        6.min(vp.h.saturating_sub(2)),
+                    );
+                    listbox_draw(buf, lb_rect, &self.listbox);
+                    if focus == 8 {
+                        let lrow = (self.listbox.selected.saturating_sub(self.listbox.top)) as u16;
+                        draw_text(buf, vp.x + 1, lb_rect.y + lrow, "►", mark_attr);
+                    }
+                    let ox =
+                        vp.x.saturating_add(34)
+                            .min(vp.right().saturating_sub(14).max(vp.x.saturating_add(2)));
+                    draw_text(buf, ox, vp.y + 1, "Opciones:", label_attr);
+                    for (i, c) in checks.iter().enumerate() {
+                        g90tui::checkbox_draw(
+                            buf,
+                            ox,
+                            vp.y + 2 + i as u16,
+                            c,
+                            focus == 7 && check_focus == i,
+                            cstyle,
+                        );
+                    }
+                    if focus == 7 {
+                        draw_text(
+                            buf,
+                            ox.saturating_sub(1),
+                            vp.y + 2 + check_focus as u16,
+                            "►",
+                            mark_attr,
+                        );
+                    }
+                    draw_text(buf, ox, vp.y + 6, "Borrado:", label_attr);
+                    for (i, label) in RADIO_B.iter().enumerate() {
+                        g90tui::radio_draw(
+                            buf,
+                            ox,
+                            vp.y + 7 + i as u16,
+                            label,
+                            radio_b == i,
+                            focus == 6,
+                            cstyle,
+                        );
+                    }
+                    if focus == 6 {
+                        draw_text(
+                            buf,
+                            ox.saturating_sub(1),
+                            vp.y + 7 + radio_b as u16,
+                            "►",
+                            mark_attr,
+                        );
+                    }
+                }
+                _ => {
+                    // General: formulario (Depto, Nombre, Clave, Fecha, cifrado).
+                    let lx = vp.x.saturating_add(2);
+                    let dd_rect = Rect::new(lx.saturating_add(8), vp.y, 20, 1);
+                    let cal_rect = Rect::new(
+                        lx.saturating_add(8),
+                        vp.y.saturating_add(3),
+                        calendar_field_width(&self.cal),
+                        1,
+                    );
+                    draw_text(buf, lx, vp.y, "Depto:", label_attr);
+                    draw_text(buf, lx, vp.y + 1, "Nombre:", label_attr);
+                    input_draw(
+                        buf,
+                        Rect::new(lx + 8, vp.y + 1, 20, 1),
+                        &self.input_name,
+                        focus == 3,
+                    );
+                    draw_text(buf, lx, vp.y + 2, "Clave:", label_attr);
+                    input_draw(
+                        buf,
+                        Rect::new(lx + 8, vp.y + 2, 20, 1),
+                        &self.input_pass,
+                        focus == 4,
+                    );
+                    if focus == 2 {
+                        draw_text(buf, vp.x, vp.y, "►", mark_attr);
+                    }
+                    if focus == 3 {
+                        draw_text(buf, vp.x, vp.y + 1, "►", mark_attr);
+                    }
+                    if focus == 4 {
+                        draw_text(buf, vp.x, vp.y + 2, "►", mark_attr);
+                    }
+                    draw_text(buf, lx, vp.y + 3, "Fecha:", label_attr);
+                    if focus == 12 {
+                        draw_text(buf, vp.x, vp.y + 3, "►", mark_attr);
+                    }
+                    for (i, label) in RADIO_A.iter().enumerate() {
+                        g90tui::radio_draw(
+                            buf,
+                            lx,
+                            vp.y + 5 + i as u16,
+                            label,
+                            radio_a == i,
+                            focus == 5,
+                            cstyle,
+                        );
+                    }
+                    if focus == 5 {
+                        draw_text(buf, vp.x, vp.y + 5 + radio_a as u16, "►", mark_attr);
+                    }
+                    // Dropdown + calendario al final: línea + overlays encima.
+                    dropdown_draw(buf, dd_rect, &self.dropdown, t);
+                    calendar_draw(buf, cal_rect, &self.cal);
+                }
+            } // fin páginas (match tabs.active)
+
+            // Progreso bajo la tarjeta (común a las 3 páginas).
+            draw_text(
+                buf,
+                d.x + 4,
+                d.y + 14,
+                "Copia:",
+                Attr::new(Color::Black, t.dialog),
+            );
+            let mut pbar = g90tui::ProgressBar::new(self.progress_pct);
+            pbar.foreground_color = t.teal;
+            progressbar_draw(buf, Rect::new(d.x + 12, d.y + 14, 22, 1), &pbar);
+            if focus == 9 {
                 draw_text(
                     buf,
-                    vp.x,
-                    vp.y + vp.h.min(12),
-                    "↑↓ mueve · PgUp/PgDn página · Tab cambia",
-                    Attr::new(Color::Black, t.dialog),
+                    d.x + 3,
+                    d.y + 14,
+                    "►",
+                    Attr::bold(Color::Red, t.dialog),
                 );
-                if focus == 8 {
-                    draw_text(
-                        buf,
-                        vp.x.saturating_sub(1),
-                        vp.y + (self.grid.selected.saturating_sub(self.grid.top)) as u16,
-                        "►",
-                        Attr::bold(Color::Red, t.dialog),
-                    );
-                }
-            } else {
-                // Página General: todos los controles (dropdown se pinta al final,
-                // para que su overlay quede encima).
-
-                // Dropdown + inputs (izquierda, filas 2/4/5).
-                draw_text(buf, lx, d.y + 2, "Depto:", label_attr);
-                draw_text(buf, lx, d.y + 4, "Nombre:", label_attr);
-                input_draw(
-                    buf,
-                    Rect::new(lx + 8, d.y + 4, 20, 1),
-                    &self.input_name,
-                    focus == 3,
-                );
-                draw_text(buf, lx, d.y + 5, "Clave:", label_attr);
-                input_draw(
-                    buf,
-                    Rect::new(lx + 8, d.y + 5, 20, 1),
-                    &self.input_pass,
-                    focus == 4,
-                );
-                if focus == 2 {
-                    draw_text(buf, lx - 1, d.y + 2, "►", Attr::bold(Color::Red, t.dialog));
-                }
-                if focus == 3 {
-                    draw_text(buf, lx - 1, d.y + 4, "►", Attr::bold(Color::Red, t.dialog));
-                }
-                if focus == 4 {
-                    draw_text(buf, lx - 1, d.y + 5, "►", Attr::bold(Color::Red, t.dialog));
-                }
-                // Fecha con popup de calendario (fila 6, overlay al final).
-                draw_text(buf, lx, d.y + 6, "Fecha:", label_attr);
-                if focus == 12 {
-                    draw_text(buf, lx - 1, d.y + 6, "►", Attr::bold(Color::Red, t.dialog));
-                }
-
-                // Radios A (izq) y lista con scrollbar (der).
-                for (i, label) in RADIO_A.iter().enumerate() {
-                    g90tui::radio_draw(
-                        buf,
-                        lx,
-                        d.y + 7 + i as u16,
-                        label,
-                        radio_a == i,
-                        focus == 5,
-                        cstyle,
-                    );
-                }
-                if focus == 5 {
-                    draw_text(
-                        buf,
-                        lx - 1,
-                        d.y + 7 + radio_a as u16,
-                        "►",
-                        Attr::bold(Color::Red, t.dialog),
-                    );
-                }
-                draw_text(buf, rx, d.y + 1, "Archivos:", label_attr);
-                let lb_w = 25.min(
-                    vp.x.saturating_add(vp.w)
-                        .saturating_sub(rx)
-                        .saturating_sub(1)
-                        .max(10),
-                );
-                let lb_rect = Rect::new(rx, d.y + 2, lb_w, 8);
-                listbox_draw(buf, lb_rect, &self.listbox);
-                if focus == 8 {
-                    let lrow = (self.listbox.selected.saturating_sub(self.listbox.top)) as u16;
-                    draw_text(
-                        buf,
-                        rx - 1,
-                        d.y + 2 + lrow,
-                        "►",
-                        Attr::bold(Color::Red, t.dialog),
-                    );
-                }
-
-                // Radios B (der, bajo la lista) y casillas (izq).
-                for (i, label) in RADIO_B.iter().enumerate() {
-                    g90tui::radio_draw(
-                        buf,
-                        rx,
-                        d.y + 11 + i as u16,
-                        label,
-                        radio_b == i,
-                        focus == 6,
-                        cstyle,
-                    );
-                }
-                if focus == 6 {
-                    draw_text(
-                        buf,
-                        rx - 1,
-                        d.y + 11 + radio_b as u16,
-                        "►",
-                        Attr::bold(Color::Red, t.dialog),
-                    );
-                }
-                for (i, c) in checks.iter().enumerate() {
-                    g90tui::checkbox_draw(
-                        buf,
-                        lx,
-                        d.y + 11 + i as u16,
-                        c,
-                        focus == 7 && check_focus == i,
-                        cstyle,
-                    );
-                }
-                if focus == 7 {
-                    draw_text(
-                        buf,
-                        lx - 1,
-                        d.y + 11 + check_focus as u16,
-                        "►",
-                        Attr::bold(Color::Red, t.dialog),
-                    );
-                }
-
-                // Progreso (izq, fila 15) con etiqueta de % dentro.
-                draw_text(buf, lx, d.y + 14, "Copia:", label_attr);
-                let mut pbar = g90tui::ProgressBar::new(self.progress_pct);
-                pbar.foreground_color = t.teal;
-                progressbar_draw(buf, Rect::new(lx + 8, d.y + 14, 22, 1), &pbar);
-                if focus == 9 {
-                    draw_text(buf, lx - 1, d.y + 14, "►", Attr::bold(Color::Red, t.dialog));
-                }
-            } // fin página General
+            }
 
             // Botones (padding 2, centrados): OK · Cancel · Abrir… (MsgBox).
             // Foco por luminancia: solo el botón con `btn_sel` cuando el
@@ -841,13 +871,6 @@ impl Show {
             let fw: u16 = fl.chars().count() as u16;
             let fx = d.x.saturating_add(d.w.saturating_sub(fw).saturating_sub(2));
             draw_text(buf, fx, d.y + d.h - 1, &fl, base);
-
-            // Dropdown + calendario al final: línea + overlays encima
-            // (solo página General).
-            if self.tabs.active == 0 {
-                dropdown_draw(buf, dd_rect, &self.dropdown, t);
-                calendar_draw(buf, cal_rect, &self.cal);
-            }
         }
 
         // MsgBox de confirmación, encima del diálogo.
@@ -1050,50 +1073,73 @@ impl Show {
                     }
                 }
             }
-            2 => match dropdown_key(&mut self.dropdown, code) {
-                DropdownKey::Accepted(i) => {
-                    self.message = format!("Depto: {}.", self.dropdown.options[i]);
+            // Solo General (0) tiene formulario; en otras páginas se ignora.
+            2 => {
+                if self.tabs.active != 0 {
+                    return true;
                 }
-                DropdownKey::Opened => {
-                    self.message = "Dropdown abierto (↑↓ Enter Esc).".to_string();
+                match dropdown_key(&mut self.dropdown, code) {
+                    DropdownKey::Accepted(i) => {
+                        self.message = format!("Depto: {}.", self.dropdown.options[i]);
+                    }
+                    DropdownKey::Opened => {
+                        self.message = "Dropdown abierto (↑↓ Enter Esc).".to_string();
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             3 => {
+                if self.tabs.active != 0 {
+                    return true;
+                }
                 if input_key(&mut self.input_name, code) == InputKey::Changed {
                     self.message = format!("Nombre: {}.", self.input_name.value);
                 }
             }
             4 => {
+                if self.tabs.active != 0 {
+                    return true;
+                }
                 if input_key(&mut self.input_pass, code) == InputKey::Changed {
                     self.message =
                         format!("Clave: {} chars.", self.input_pass.value.chars().count());
                 }
             }
             5 => {
+                if self.tabs.active != 0 {
+                    return true;
+                }
                 if let RadioNav::Select(i) = radio_key(RADIO_A.len(), self.radio_a, code) {
                     self.radio_a = i;
                 }
             }
             6 => {
+                if self.tabs.active != 2 {
+                    return true;
+                }
                 if let RadioNav::Select(i) = radio_key(RADIO_B.len(), self.radio_b, code) {
                     self.radio_b = i;
                 }
             }
-            7 => match check_key(&self.checks, self.check_focus, code) {
-                CheckNav::Move(i) => self.check_focus = i,
-                CheckNav::Toggled(i) => {
-                    if let Some(c) = self.checks.get_mut(i) {
-                        c.checked = !c.checked;
-                        self.message = format!(
-                            "{}: {}.",
-                            c.label.replace('&', ""),
-                            if c.checked { "sí" } else { "no" }
-                        );
-                    }
+            7 => {
+                if self.tabs.active != 2 {
+                    return true;
                 }
-                CheckNav::Stay => {}
-            },
+                match check_key(&self.checks, self.check_focus, code) {
+                    CheckNav::Move(i) => self.check_focus = i,
+                    CheckNav::Toggled(i) => {
+                        if let Some(c) = self.checks.get_mut(i) {
+                            c.checked = !c.checked;
+                            self.message = format!(
+                                "{}: {}.",
+                                c.label.replace('&', ""),
+                                if c.checked { "sí" } else { "no" }
+                            );
+                        }
+                    }
+                    CheckNav::Stay => {}
+                }
+            }
             8 => {
                 if self.tabs.active == 1 {
                     // Página Inventario: la lista mueve el GridTable vía su
@@ -1107,8 +1153,8 @@ impl Show {
                         }
                         g90tui::GridNav::Stay => {}
                     }
-                } else {
-                    let vis = 8usize; // alto del listbox en el diálogo
+                } else if self.tabs.active == 2 {
+                    let vis = 8usize; // alto del listbox en la tarjeta
                     match listbox_key(&mut self.listbox, vis, code) {
                         g90tui::ListNav::Move(i) => {
                             self.message = format!("Archivo: {}.", self.listbox.items[i]);
@@ -1116,6 +1162,7 @@ impl Show {
                         g90tui::ListNav::Stay => {}
                     }
                 }
+                // En General no hay lista: se ignora.
             }
             9 => match code {
                 KeyCode::Left | KeyCode::Down => {
@@ -1152,15 +1199,20 @@ impl Show {
                 _ => {}
             },
             // Fecha del calendario (página General).
-            12 => match calendar_key_mod(&mut self.cal, code, mods) {
-                CalNav::Accepted(y, m, d) => {
-                    self.message = format!("Fecha: {d:02}/{m:02}/{y:04}.");
+            12 => {
+                if self.tabs.active != 0 {
+                    return true;
                 }
-                CalNav::Opened => {
-                    self.message = "Fecha: elige día (Enter acepta, Esc cancela).".to_string();
+                match calendar_key_mod(&mut self.cal, code, mods) {
+                    CalNav::Accepted(y, m, d) => {
+                        self.message = format!("Fecha: {d:02}/{m:02}/{y:04}.");
+                    }
+                    CalNav::Opened => {
+                        self.message = "Fecha: elige día (Enter acepta, Esc cancela).".to_string();
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             // Pestañas del diálogo: flechas cambian de página, `t` rota Top/Left.
             // Al cambiar de página se re-activa su ámbito: el foco salta
             // solo a widgets visibles (nunca a la página oculta).
